@@ -250,7 +250,7 @@ Transform:
   m_GameObject: {fileID: 49191716}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -462.2, y: 8.17, z: 220.4}
+  m_LocalPosition: {x: -324.6, y: 2.82, z: 345}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -918,11 +918,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   terrain: {fileID: 1557985721}
   texture: {fileID: 2800000, guid: 3d6ea8373013b3546a620f84802e06f6, type: 3}
-  width: 256
-  height: 256
-  maxHeight: 6
-  scale: 50
+  width: 512
+  height: 512
+  maxHeight: 60
+  scale: 20
   tileSize: 10
+  flatRadius: 2
+  difficultyCoef: 1.3
+  difficultyCoefLinear: 0.5
 --- !u!4 &499586884
 Transform:
   m_ObjectHideFlags: 0
