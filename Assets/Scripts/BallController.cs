@@ -10,6 +10,7 @@ public class BallController : MonoBehaviour
     
     public float jumpForce = 5f;
     public Transform cam;
+    public float powerForce = 5f;
     public float handbrakeForce = 5f;
     
     public LayerMask groundLayer;
@@ -93,7 +94,7 @@ public class BallController : MonoBehaviour
             // 1. Если есть ввод — добавляем силу (ускорение)
             if (isGrounded && inputDirection.magnitude > 0.1f)
             {
-                rb.AddForce(inputDirection.normalized * 3f, ForceMode.Force); // 3f - сила ускорения
+                rb.AddForce(inputDirection.normalized * powerForce, ForceMode.Force); // 3f - сила ускорения
             }
 
             // 2. Коррекция направления скорости, если шарик едет
