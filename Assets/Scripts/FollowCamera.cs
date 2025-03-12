@@ -6,7 +6,7 @@ public class FollowCamera : MonoBehaviour
     public Vector3 offset = new Vector3(0, 2, 5); // Смещение камеры (z положительный!)
 
     public BallController ballController;
-    public float smoothSpeed = 5f; // Плавность движения камеры
+    public float smoothSpeed = 2f; // Плавность движения камеры
     public float minHeightAboveTarget = 1f; // Минимальная высота над шариком
     public float horizontalVelocityThreshold = 0.5f; // Минимальная скорость для обновления направления
     public float rotationSpeed = 5f; // Скорость поворота камеры

@@ -20,14 +20,14 @@ public class BallController : MonoBehaviour
     private Vector2 moveInput;
     private bool handbrakeActive;
 
-    private float groundCheckDistance = 3f;
+    private float groundCheckDistance;
     private bool isGrounded;
 
     private Vector3 spawnPosition;
 
     public bool isFallen { get; private set; } = false;
     private float airTime = 0f;
-    private float maxAirTime = 3f;
+    private float maxAirTime = 5f;
     private float absoluteFallThreshold = -200f;
 
     private InputSystem_Actions inputActions;
@@ -53,6 +53,7 @@ public class BallController : MonoBehaviour
         rb = GetComponent<Rigidbody>();
         spawnPosition = transform.position;
         respawnText.gameObject.SetActive(false);
+        groundCheckDistance = rb.transform.localScale.x / 2 + 0.1f; // 0.51f
     }
 
     void FixedUpdate()
@@ -94,13 +95,13 @@ public class BallController : MonoBehaviour
             float speedMagnitude = horizontalVelocity.magnitude;
 
             // 1. Ускорение
-            if (isGrounded && inputDirection.magnitude > 0.1f)
+            if (isGrounded && inputDirection.magnitude > 0.01f)
             {
                 rb.AddForce(inputDirection.normalized * powerForce, ForceMode.Force);
             }
 
             // 2. Коррекция направления без потери Y
-            if (isGrounded && speedMagnitude > 0.1f && inputDirection.magnitude > 0.1f)
+            if (isGrounded && speedMagnitude > 0.1f && inputDirection.magnitude > 0.01f)
             {
                 Vector3 targetHorizontalVelocity = inputDirection.normalized * speedMagnitude;
                 Vector3 smoothedVelocity = Vector3.Lerp(horizontalVelocity, targetHorizontalVelocity, Time.fixedDeltaTime * 3f);
@@ -108,7 +109,7 @@ public class BallController : MonoBehaviour
             }
 
             // 3. Ручник (торможение только по XZ)
-            if (isGrounded && handbrakeActive && horizontalVelocity.magnitude > 0.1f)
+            if (isGrounded && handbrakeActive && horizontalVelocity.magnitude > 0.01f)
             {
                 Vector3 slowedHorizontal = Vector3.Lerp(horizontalVelocity, Vector3.zero, Time.fixedDeltaTime * handbrakeForce);
                 rb.linearVelocity = new Vector3(slowedHorizontal.x, verticalVelocity, slowedHorizontal.z);
