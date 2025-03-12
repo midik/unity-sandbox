@@ -17,8 +17,10 @@ public class TerrainGenerator : MonoBehaviour
 
     void Start()
     {
-        terrain.terrainData = GenerateTerrain(terrain.terrainData);
-        AddTexture(terrain.terrainData);
+        TerrainData data = new TerrainData();
+        terrain.terrainData = data; // назначить сразу
+        GenerateTerrain(data);
+        AddTexture(data);
     }
 
     TerrainData GenerateTerrain(TerrainData terrainData)

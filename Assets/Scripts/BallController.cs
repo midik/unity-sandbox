@@ -20,7 +20,7 @@ public class BallController : MonoBehaviour
     private Vector2 moveInput;
     private bool handbrakeActive;
     
-    private float groundCheckDistance = 0.6f;
+    private float groundCheckDistance = 3f;
     private bool isGrounded;
     
     private Vector3 spawnPosition;
