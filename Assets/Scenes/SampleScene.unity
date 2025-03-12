@@ -272,6 +272,9 @@ MonoBehaviour:
   jumpForce: 5
   cam: {fileID: 330585546}
   handbrakeForce: 0.3
+  groundLayer:
+    serializedVersion: 2
+    m_Bits: 1
 --- !u!1 &330585543
 GameObject:
   m_ObjectHideFlags: 0
@@ -428,7 +431,7 @@ MonoBehaviour:
   smoothSpeed: 2
   minHeightAboveTarget: 1
   horizontalVelocityThreshold: 0.5
-  ballController: {fileID: 49191722}
+  rotationSpeed: 5
 --- !u!114 &330585549
 MonoBehaviour:
   m_ObjectHideFlags: 0

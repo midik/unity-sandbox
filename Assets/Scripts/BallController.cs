@@ -1,6 +1,5 @@
 using TMPro;
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 public class BallController : MonoBehaviour
 {
@@ -8,12 +7,14 @@ public class BallController : MonoBehaviour
     public float jumpForce = 0.3f;
     public Transform cam;
     public float handbrakeForce = 0.2f;
-    public bool isInputActive => moveInput.magnitude > 0.1f;
-
+    public bool isGrounded { get; private set; }
+    public LayerMask groundLayer;
+    
     private Rigidbody rb;
-    private bool isGrounded;
     private Vector2 moveInput;
     private bool handbrakeActive;
+    
+    private float groundCheckDistance = 0.6f;
     
     private InputSystem_Actions inputActions;
     
@@ -50,9 +51,12 @@ public class BallController : MonoBehaviour
     
         // Направление от игрока (вектор управления)
         Vector3 inputDirection = camForward * moveInput.y + camRight * moveInput.x;
+        
+        // Чистая проверка через луч вниз
+        isGrounded = Physics.Raycast(transform.position, Vector3.down, groundCheckDistance, groundLayer);
 
         // 1. Если есть ввод — добавляем силу (ускорение)
-        if (inputDirection.magnitude > 0.1f)
+        if (isGrounded && inputDirection.magnitude > 0.1f)
         {
             rb.AddForce(inputDirection.normalized * 3f, ForceMode.Force); // 3f - сила ускорения
         }
@@ -61,14 +65,14 @@ public class BallController : MonoBehaviour
         Vector3 currentVelocity = rb.linearVelocity;
         float speedMagnitude = currentVelocity.magnitude;
 
-        if (speedMagnitude > 0.1f && inputDirection.magnitude > 0.1f && isGrounded)
+        if (isGrounded && speedMagnitude > 0.1f && inputDirection.magnitude > 0.1f)
         {
             Vector3 newVelocity = inputDirection.normalized * speedMagnitude;
             rb.linearVelocity = Vector3.Lerp(currentVelocity, newVelocity, Time.fixedDeltaTime * 3f);
         }
 
         // 3. Ручник
-        if (handbrakeActive && rb.linearVelocity.magnitude > 0f)
+        if (isGrounded && handbrakeActive && rb.linearVelocity.magnitude > 0f)
         {
             rb.linearVelocity = Vector3.Lerp(rb.linearVelocity, Vector3.zero, Time.fixedDeltaTime * 5f); // быстрое торможение
         }
@@ -81,15 +85,15 @@ public class BallController : MonoBehaviour
     {
         if (isGrounded)
         {
+            // isGrounded = false;
             rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
-            isGrounded = false;
         }
     }
 
     // Проверяем, на земле ли шарик (OnCollisionStay, чтобы не пропускать моменты)
     private void OnCollisionStay(Collision collision)
     {
-        isGrounded = true;
+        // isGrounded = true;
     }
 
     void UpdateSpeedometer()
