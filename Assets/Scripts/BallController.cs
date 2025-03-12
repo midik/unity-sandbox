@@ -1,20 +1,37 @@
 using TMPro;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 public class BallController : MonoBehaviour
 {
-    public TextMeshProUGUI speedText; // UI элемент для скорости
-    
-    public float speed = 0.5f;
+    public TextMeshProUGUI speedText;
     public float jumpForce = 0.3f;
-    // public float drag = 0.98f;
-    public bool isInputActive = false;
     public Transform cam;
     public float handbrakeForce = 0.2f;
+    public bool isInputActive => moveInput.magnitude > 0.1f;
 
     private Rigidbody rb;
-    private bool isGrounded; // Чтобы прыгать только по земле
+    private bool isGrounded;
+    private Vector2 moveInput;
+    private bool handbrakeActive;
     
+    private InputSystem_Actions inputActions;
+    
+    void Awake()
+    {
+        inputActions = new InputSystem_Actions();
+        inputActions.Player.Move.performed += ctx => moveInput = ctx.ReadValue<Vector2>();
+        inputActions.Player.Move.canceled += ctx => moveInput = Vector2.zero;
+
+        inputActions.Player.Handbrake.performed += ctx => handbrakeActive = true;
+        inputActions.Player.Handbrake.canceled += ctx => handbrakeActive = false;
+
+        inputActions.Player.Jump.performed += ctx => Jump();
+    }
+
+    void OnEnable() => inputActions.Enable();
+    void OnDisable() => inputActions.Disable();
+
     
     void Start()
     {
@@ -23,55 +40,62 @@ public class BallController : MonoBehaviour
 
     void FixedUpdate()
     {
-        // Считываем ввод
-        float moveHorizontal = Input.GetAxis("Horizontal");
-        float moveVertical = Input.GetAxis("Vertical");
-        bool handBrake = Input.GetButton("Handbrake");
-
-        isInputActive = Mathf.Abs(moveHorizontal) > 0.1f || Mathf.Abs(moveVertical) > 0.1f;
-
-
-        // Получаем направления камеры
         Vector3 camForward = cam.forward;
-        Vector3 camRight = cam.right;
-
-        // Убираем наклон по Y, чтобы не двигался вверх/вниз
         camForward.y = 0;
-        camRight.y = 0;
-
-        // Нормализуем (на всякий случай)
         camForward.Normalize();
+    
+        Vector3 camRight = cam.right;
+        camRight.y = 0;
         camRight.Normalize();
+    
+        // Направление от игрока (вектор управления)
+        Vector3 inputDirection = camForward * moveInput.y + camRight * moveInput.x;
 
-        // Направление движения: вперёд/назад + влево/вправо относительно камеры
-        Vector3 movement = camForward * moveVertical + camRight * moveHorizontal;
-
-        // Ручник
-        if (handBrake && rb.linearVelocity.magnitude > 0f)
+        // 1. Если есть ввод — добавляем силу (ускорение)
+        if (inputDirection.magnitude > 0.1f)
         {
-            rb.AddForce(movement * handbrakeForce);
+            rb.AddForce(inputDirection.normalized * 3f, ForceMode.Force); // 3f - сила ускорения
         }
 
-        // Добавляем силу к шарику
-        // rb.AddForce(movement * speed);
-        // rb.linearVelocity *= drag;
-        rb.AddForce(movement * speed, ForceMode.Impulse);
-        
-        // Прыжок (FixedUpdate для физики)
-        if (Input.GetKey(KeyCode.Space) && isGrounded)
+        // 2. Коррекция направления скорости, если шарик едет
+        Vector3 currentVelocity = rb.linearVelocity;
+        float speedMagnitude = currentVelocity.magnitude;
+
+        if (speedMagnitude > 0.1f && inputDirection.magnitude > 0.1f && isGrounded)
+        {
+            Vector3 newVelocity = inputDirection.normalized * speedMagnitude;
+            rb.linearVelocity = Vector3.Lerp(currentVelocity, newVelocity, Time.fixedDeltaTime * 3f);
+        }
+
+        // 3. Ручник
+        if (handbrakeActive && rb.linearVelocity.magnitude > 0f)
+        {
+            rb.linearVelocity = Vector3.Lerp(rb.linearVelocity, Vector3.zero, Time.fixedDeltaTime * 5f); // быстрое торможение
+        }
+
+        // 4. Показания скорости
+        UpdateSpeedometer();    
+    }
+    
+    void Jump()
+    {
+        if (isGrounded)
         {
             rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
-            isGrounded = false; // Чтобы не прыгал в воздухе
+            isGrounded = false;
         }
-        
-        // Обновляем скорость на UI
-        float speedValue = rb.linearVelocity.magnitude;
-        speedText.text = "Speed: " + speedValue.ToString("F2");
     }
 
     // Проверяем, на земле ли шарик (OnCollisionStay, чтобы не пропускать моменты)
     private void OnCollisionStay(Collision collision)
     {
         isGrounded = true;
+    }
+
+    void UpdateSpeedometer()
+    {
+        Vector3 horizontalVelocity = new Vector3(rb.linearVelocity.x, 0, rb.linearVelocity.z);
+        float horizontalSpeed = horizontalVelocity.magnitude;
+        speedText.text = horizontalSpeed.ToString("F2") + " m/s";
     }
 }

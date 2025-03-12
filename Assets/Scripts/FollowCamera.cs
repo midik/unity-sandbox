@@ -8,12 +8,12 @@ public class FollowCamera : MonoBehaviour
     public float minHeightAboveTarget = 2.0f; // Минимальная высота над шариком
     public float velocityThreshold = 0.2f;
     public BallController ballController;
-    
+
     private Vector3 defaultDirection = new Vector3(0, 2, -5);
     private Vector3 currentDirection;
     private Rigidbody targetRb; // Для доступа к скорости шарика
 
-    
+
     void Start()
     {
         currentDirection = defaultDirection;
@@ -23,34 +23,29 @@ public class FollowCamera : MonoBehaviour
     void LateUpdate()
     {
         Vector3 velocity = targetRb.linearVelocity;
-        Vector3 targetDirection = currentDirection; // по умолчанию старое
+        Vector3 horizontalVelocity = new Vector3(velocity.x, 0, velocity.z);
 
-        if (!ballController.isInputActive && velocity.magnitude > velocityThreshold)
+        Vector3 targetDirection = currentDirection; // по умолчанию старое направление
+
+        if (horizontalVelocity.magnitude > 0.5f && !ballController.isInputActive) // не реагировать сразу
         {
-            targetDirection = velocity.normalized; // Обновляем направление, если нет активного ввода
+            targetDirection = horizontalVelocity.normalized;
         }
 
+        // Плавная интерполяция направления
+        currentDirection = Vector3.Lerp(currentDirection, targetDirection, Time.deltaTime * 3f);
 
-        // Плавная интерполяция (чтобы не дергалось)
-        currentDirection = Vector3.Lerp(currentDirection, targetDirection, Time.deltaTime * 5f); // 5f - "скорость поворота"
-        
-        Vector3 desiredPositionXZ = target.position + currentDirection * offset.z;
-        Vector3 desiredPosition = new Vector3(
-            desiredPositionXZ.x,
-            Mathf.Lerp(transform.position.y, target.position.y + offset.y, Time.deltaTime * 2f), // вертикаль плавно
-            desiredPositionXZ.z
-        );
+        // Камера относительно шара
+        Vector3 desiredPosition = target.position + currentDirection * offset.z + Vector3.up * offset.y;
 
-        // Проверяем высоту, чтобы не опускалась ниже
+        // Минимальная высота (если хочешь)
         if (desiredPosition.y < target.position.y + minHeightAboveTarget)
         {
             desiredPosition.y = target.position.y + minHeightAboveTarget;
         }
 
-        Vector3 smoothedPosition = Vector3.Lerp(transform.position, desiredPosition, smoothSpeed);
-        transform.position = smoothedPosition;
-
+        // Плавное движение
+        transform.position = Vector3.Lerp(transform.position, desiredPosition, smoothSpeed);
         transform.LookAt(target);
     }
-
 }
