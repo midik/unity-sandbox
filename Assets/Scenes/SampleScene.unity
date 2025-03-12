@@ -482,10 +482,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 490976818}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.5, y: 0.5}
-  m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 640.9684, y: -323.25104}
-  m_SizeDelta: {x: 178.7956, y: 48.0804}
+  m_AnchorMin: {x: 1, y: 0}
+  m_AnchorMax: {x: 1, y: 0}
+  m_AnchoredPosition: {x: -129, y: 71}
+  m_SizeDelta: {x: 178.7956, y: 48.080383}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &331500218
 MonoBehaviour:
@@ -618,9 +618,9 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 490976818}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.5, y: 0.5}
-  m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -679, y: 284}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 93, y: -85}
   m_SizeDelta: {x: 100, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &332069837
@@ -917,10 +917,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   terrain: {fileID: 1557985721}
+  texture: {fileID: 2800000, guid: 3d6ea8373013b3546a620f84802e06f6, type: 3}
   width: 256
   height: 256
   maxHeight: 6
   scale: 50
+  tileSize: 10
 --- !u!4 &499586884
 Transform:
   m_ObjectHideFlags: 0
@@ -1436,9 +1438,9 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 490976818}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.5, y: 0.5}
-  m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 620, y: 323}
+  m_AnchorMin: {x: 1, y: 1}
+  m_AnchorMax: {x: 1, y: 1}
+  m_AnchoredPosition: {x: -141, y: -69}
   m_SizeDelta: {x: 200, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1858926891
