@@ -4,6 +4,8 @@ public class FollowCamera : MonoBehaviour
 {
     public Transform target; // Шарик
     public Vector3 offset = new Vector3(0, 2, 5); // Смещение камеры (z положительный!)
+
+    public BallController ballController;
     public float smoothSpeed = 5f; // Плавность движения камеры
     public float minHeightAboveTarget = 1f; // Минимальная высота над шариком
     public float horizontalVelocityThreshold = 0.5f; // Минимальная скорость для обновления направления
@@ -25,6 +27,8 @@ public class FollowCamera : MonoBehaviour
 
     void LateUpdate()
     {
+        if (ballController.isFallen) return;
+        
         Vector3 velocity = targetRb.linearVelocity;
         Vector3 horizontalVelocity = new Vector3(velocity.x, 0, velocity.z);
 
@@ -49,4 +53,12 @@ public class FollowCamera : MonoBehaviour
         transform.position = Vector3.Lerp(transform.position, desiredPosition, Time.deltaTime * smoothSpeed);
         transform.LookAt(target);
     }
+    
+    public void ResetToTarget()
+    {
+        Vector3 resetPosition = target.position - currentDirection * offset.z + Vector3.up * offset.y;
+        transform.position = resetPosition;
+        transform.LookAt(target);
+    }
+
 }
