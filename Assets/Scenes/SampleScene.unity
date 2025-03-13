@@ -149,8 +149,8 @@ Rigidbody:
   m_GameObject: {fileID: 49191716}
   serializedVersion: 4
   m_Mass: 2
-  m_Drag: 0
-  m_AngularDrag: 1
+  m_Drag: 0.1
+  m_AngularDrag: 0.1
   m_CenterOfMass: {x: 0, y: 0, z: 0}
   m_InertiaTensor: {x: 1, y: 1, z: 1}
   m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
@@ -166,7 +166,7 @@ Rigidbody:
   m_IsKinematic: 0
   m_Interpolate: 0
   m_Constraints: 0
-  m_CollisionDetection: 0
+  m_CollisionDetection: 1
 --- !u!135 &49191718
 SphereCollider:
   m_ObjectHideFlags: 0
@@ -272,10 +272,10 @@ MonoBehaviour:
   altitudeText: {fileID: 1586750000}
   respawnText: {fileID: 1106740468}
   followCamera: {fileID: 330585548}
-  jumpForce: 20
+  jumpForce: 15
   cam: {fileID: 330585546}
-  powerForce: 20
-  handbrakeForce: 20
+  powerForce: 15
+  handbrakeForce: 12
   groundLayer:
     serializedVersion: 2
     m_Bits: 1
@@ -433,10 +433,12 @@ MonoBehaviour:
   target: {fileID: 49191721}
   offset: {x: 0, y: 5, z: -10}
   ballController: {fileID: 49191722}
-  smoothSpeed: 2
-  minHeightAboveTarget: 1
-  horizontalVelocityThreshold: 0.5
-  rotationSpeed: 5
+  smoothSpeed: 8
+  lookSmoothSpeed: 5
+  minHeightAboveTarget: 1.5
+  groundLayer:
+    serializedVersion: 2
+    m_Bits: 1
 --- !u!114 &330585549
 MonoBehaviour:
   m_ObjectHideFlags: 0
