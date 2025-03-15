@@ -29,7 +29,8 @@ public class CarController : MonoBehaviour
         FL.steerAngle = steering;
         FR.steerAngle = steering;
         
-        // 2WD
+        FL.motorTorque = motor;
+        RL.motorTorque = motor;
         RL.motorTorque = motor;
         RR.motorTorque = motor;
     }
