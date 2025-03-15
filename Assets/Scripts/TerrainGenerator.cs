@@ -10,17 +10,19 @@ public class TerrainGenerator : MonoBehaviour
     public int maxHeight = 20;
     public float scale = 50f;
     public float tileSize = 10;
+    public TerrainData terrainData;
 
-    public float flatRadius = 20f;
-    public float difficultyCoef = 2;
+    public float flatRadius = 2f;
+    public float difficultyCoef = 1.2f;
     public float difficultyCoefLinear = 2;
 
     void Start()
     {
-        TerrainData data = new TerrainData();
-        terrain.terrainData = data; // назначить сразу
-        GenerateTerrain(data);
-        AddTexture(data);
+        // TerrainData data = new TerrainData();
+        terrain.terrainData = terrainData; // назначить сразу
+        GenerateTerrain(terrainData);
+        AddTexture(terrainData);
+        terrain.Flush();
     }
 
     TerrainData GenerateTerrain(TerrainData terrainData)
@@ -50,7 +52,7 @@ public class TerrainGenerator : MonoBehaviour
                 }
                 else
                 {
-                    float normalizedDistance = distance / maxDistance;
+                    float normalizedDistance = (distance - flatRadius) / maxDistance;
                     // float distanceFactor = Mathf.Pow(normalizedDistance, difficultyExponent);
                     float distanceFactor = normalizedDistance * difficultyCoef;
                     float xCoord = (float)x / width * scale;
