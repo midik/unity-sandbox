@@ -80,12 +80,12 @@ public class CarController : MonoBehaviour
 
     void Respawn()
     {
-        transform.position = spawnPosition + Vector3.up * 0.5f;
-        transform.rotation = Quaternion.Euler(spawnRotation);
-        
         rb.linearVelocity = Vector3.zero;
         rb.angularVelocity = Vector3.zero;
         Drive(0f, 0f);
+        
+        transform.position = spawnPosition + Vector3.up * 0.5f;
+        transform.rotation = Quaternion.Euler(spawnRotation);
 
         aliveDetector.recover();
 
