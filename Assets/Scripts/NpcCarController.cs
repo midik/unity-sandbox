@@ -10,7 +10,7 @@ public class NpcCarController : MonoBehaviour
     public float motorTorque = 1000f;
     public float steerAngle = 30f;
     public float maxSpeed = 20f;
-    public float stopDistance = 10f; // расстояние, когда NPC "доволен"
+    public float stopDistance = 15f; // расстояние, когда NPC "доволен"
 
     public Rigidbody rb;
     public AliveDetector aliveDetector;
@@ -23,6 +23,9 @@ public class NpcCarController : MonoBehaviour
 
     private Vector3 spawnPosition;
     private Vector3 spawnRotation;
+    
+    private bool isRespawnPending = false;
+    
 
     void Start()
     {
@@ -37,12 +40,14 @@ public class NpcCarController : MonoBehaviour
 
     void FixedUpdate()
     {
-        if (aliveDetector.isDead)
+        if (aliveDetector.isDead && !isRespawnPending)
         {
             logger.Log("NPC car stuck");
             
             Drive(0f, 0f);
             StartCoroutine(RespawnAfterDelay(3f));
+            isRespawnPending = true;
+            
             return;
         }
 
@@ -61,7 +66,7 @@ public class NpcCarController : MonoBehaviour
 
         // Если далеко — газуем, иначе останавливаемся
         float distance = toTarget.magnitude;
-        float motor = distance > 10f ? motorTorque : 0f;
+        float motor = distance > stopDistance ? motorTorque : 0f;
 
         // --- Управляем колесами ---
         Drive(steer, motor);
@@ -95,6 +100,7 @@ public class NpcCarController : MonoBehaviour
         Drive(0f, 0f);
 
         aliveDetector.recover();
+        isRespawnPending = false;
         logger.Log("NPC respawn completed");
     }
 }

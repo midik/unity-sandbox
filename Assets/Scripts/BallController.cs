@@ -4,7 +4,6 @@ using UnityEngine;
 public class BallController : MonoBehaviour
 {
     public TextMeshProUGUI speedText;
-    public TextMeshProUGUI altitudeText;
     public TextMeshProUGUI respawnText;
 
     public SmartFollowCamera followCamera;
@@ -143,9 +142,6 @@ public class BallController : MonoBehaviour
 
         Vector3 horizontalVelocity = new Vector3(rb.linearVelocity.x, 0, rb.linearVelocity.z);
         float horizontalSpeed = horizontalVelocity.magnitude;
-        speedText.text = horizontalSpeed.ToString("F1") + " m/s";
-
-        float altitude = transform.position.y;
-        altitudeText.text = altitude.ToString("F1") + " m";
+        speedText.text = horizontalSpeed.ToString("F0") + " m/s";
     }
 }
