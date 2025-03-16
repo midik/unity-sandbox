@@ -447,10 +447,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 490976818}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 1, y: 0}
-  m_AnchorMax: {x: 1, y: 0}
-  m_AnchoredPosition: {x: -1545, y: 51}
-  m_SizeDelta: {x: 178.7956, y: 48.080383}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 115, y: 51}
+  m_SizeDelta: {x: 178.79565, y: 48.080383}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &113013355
 MonoBehaviour:
@@ -836,7 +836,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 0a232aaa7b7335169a58709bd98b34b2, type: 2}
+  - {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
