@@ -15,6 +15,11 @@ public class TerrainGenerator : MonoBehaviour
     public float flatRadius = 2f;
     public float difficultyCoef = 1.2f;
     public float difficultyCoefLinear = 2;
+    
+    public int numValleys = 3;
+    public float valleyDepth = 0.3f; // глубина долины
+    public float valleyWidth = 0.8f; // "размазанность" долины
+
 
     void Start()
     {
@@ -45,26 +50,31 @@ public class TerrainGenerator : MonoBehaviour
             {
                 Vector2 point = new Vector2(x, y);
                 float distance = Vector2.Distance(point, center);
+                float normalizedDistance = (distance - flatRadius) / maxDistance;
+                normalizedDistance = Mathf.Max(0, normalizedDistance); // не уходить в минус
 
-                if (distance < flatRadius)
-                {
-                    heights[x, y] = 0f; // Плоская зона
-                }
-                else
-                {
-                    float normalizedDistance = (distance - flatRadius) / maxDistance;
-                    // float distanceFactor = Mathf.Pow(normalizedDistance, difficultyExponent);
-                    float distanceFactor = normalizedDistance * difficultyCoef;
-                    float xCoord = (float)x / width * scale;
-                    float yCoord = (float)y / height * scale;
-                    float noise = Mathf.PerlinNoise(xCoord, yCoord);
-                    heights[x, y] = noise * distanceFactor + normalizedDistance * difficultyCoefLinear;
-                }
+                float distanceFactor = normalizedDistance * difficultyCoef;
+                float xCoord = (float)x / width * scale;
+                float yCoord = (float)y / height * scale;
+                float noise = Mathf.PerlinNoise(xCoord, yCoord);
+
+                // Базовая высота
+                float finalHeight = noise * distanceFactor + normalizedDistance * difficultyCoefLinear;
+
+                // --- Генерация радиальных долин ---
+                float angle = Mathf.Atan2(y - center.y, x - center.x);
+                float radialValley = (Mathf.Sin(angle * numValleys) + 1f) / 2f; // в [0,1]
+                radialValley = Mathf.Pow(radialValley, valleyWidth); // сделать более острым/размытым
+                float valleyEffect = radialValley * valleyDepth;
+
+                // --- Итоговая высота с учетом долин ---
+                heights[x, y] = Mathf.Max(0, finalHeight - valleyEffect);
             }
         }
 
         return heights;
     }
+
 
 
     void AddTexture(TerrainData terrainData)
@@ -75,4 +85,15 @@ public class TerrainGenerator : MonoBehaviour
 
         terrainData.terrainLayers = new TerrainLayer[] { layer }; // Добавляем слой
     }
+    
+    [ContextMenu("Generate Terrain")]
+    void GenerateFromEditor()
+    {
+        Start();
+    }
+    
+    // void OnValidate()
+    // {
+    //     Start(); // автоматически генерировать при изменениях параметров
+    // }
 }

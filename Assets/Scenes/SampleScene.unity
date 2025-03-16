@@ -1364,8 +1364,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.061140902, y: 0.913363, z: -0.14991915, w: 0.3735694}
-  m_LocalPosition: {x: 224.18488, y: 8.194844, z: 274.73392}
+  m_LocalRotation: {x: -0.20201072, y: -0.2257078, z: 0.048077032, w: -0.95180684}
+  m_LocalPosition: {x: 561.2076, y: 7.8190317, z: 557.12006}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -2657,15 +2657,18 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   terrain: {fileID: 718181260}
   texture: {fileID: 2800000, guid: 3d6ea8373013b3546a620f84802e06f6, type: 3}
-  width: 512
-  height: 512
+  width: 2048
+  height: 2048
   maxHeight: 60
-  scale: 20
+  scale: 30
   tileSize: 10
   terrainData: {fileID: 15600000, guid: abcd26ef0c7f339b085642c3871ceee6, type: 2}
-  flatRadius: 20
-  difficultyCoef: 1.2
-  difficultyCoefLinear: 0.5
+  flatRadius: 40
+  difficultyCoef: 1.4
+  difficultyCoefLinear: 0.6
+  numValleys: 2
+  valleyDepth: 0.8
+  valleyWidth: 10
 --- !u!4 &499586884
 Transform:
   m_ObjectHideFlags: 0
@@ -3322,7 +3325,7 @@ Transform:
   m_GameObject: {fileID: 1000844537}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 330.1, y: 0, z: 330.2}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -6689,7 +6692,7 @@ Transform:
   m_GameObject: {fileID: 1739615152}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 1.94, z: 0}
+  m_LocalPosition: {x: 332.16, y: -0.64, z: 306.19}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
