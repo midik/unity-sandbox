@@ -184,7 +184,7 @@ SphereCollider:
   m_LayerOverridePriority: 0
   m_IsTrigger: 0
   m_ProvidesContacts: 0
-  m_Enabled: 1
+  m_Enabled: 0
   serializedVersion: 3
   m_Radius: 0.5
   m_Center: {x: 0, y: 0, z: 0}
@@ -195,7 +195,7 @@ MeshRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 49191716}
-  m_Enabled: 1
+  m_Enabled: 0
   m_CastShadows: 1
   m_ReceiveShadows: 1
   m_DynamicOccludee: 1
@@ -263,7 +263,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 49191716}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 44cf0acc17ee7acee92bcda4e5ddee14, type: 3}
   m_Name: 
@@ -271,7 +271,7 @@ MonoBehaviour:
   speedText: {fileID: 331500218}
   altitudeText: {fileID: 1586750000}
   respawnText: {fileID: 1106740468}
-  followCamera: {fileID: 330585548}
+  followCamera: {fileID: 330585551}
   jumpForce: 15
   cam: {fileID: 330585546}
   powerForce: 15
@@ -1286,9 +1286,7 @@ GameObject:
   - component: {fileID: 330585545}
   - component: {fileID: 330585544}
   - component: {fileID: 330585547}
-  - component: {fileID: 330585548}
   - component: {fileID: 330585549}
-  - component: {fileID: 330585550}
   - component: {fileID: 330585551}
   m_Layer: 0
   m_Name: Main Camera
@@ -1364,8 +1362,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
-  m_LocalRotation: {x: -0.20201072, y: -0.2257078, z: 0.048077032, w: -0.95180684}
-  m_LocalPosition: {x: 561.2076, y: 7.8190317, z: 557.12006}
+  m_LocalRotation: {x: -0.22101054, y: -0.3137024, z: 0.07551062, w: -0.9203496}
+  m_LocalPosition: {x: 555.04755, y: 14.01733, z: 551.15826}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1415,27 +1413,6 @@ MonoBehaviour:
     m_MipBias: 0
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
---- !u!114 &330585548
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 330585543}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7da5d1fcb47935277b0bda51bee65050, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  target: {fileID: 0}
-  offset: {x: 0, y: 5, z: -10}
-  ballController: {fileID: 0}
-  smoothSpeed: 8
-  lookSmoothSpeed: 5
-  minHeightAboveTarget: 1.5
-  groundLayer:
-    serializedVersion: 2
-    m_Bits: 1
 --- !u!114 &330585549
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1443,33 +1420,13 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 330585543}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 53a6147b98e3083059c3bf31ad5d6ba2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   compassArrow: {fileID: 332069836}
   cameraTransform: {fileID: 330585546}
---- !u!114 &330585550
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 330585543}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d534c6e002634d13abb2bde4a09be60a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  target: {fileID: 122354927}
-  offset: {x: 0, y: 3, z: -15}
-  smoothSpeed: 5
-  lookSmoothSpeed: 5
-  minHeightAboveTarget: 1.5
-  groundLayer:
-    serializedVersion: 2
-    m_Bits: 1
 --- !u!114 &330585551
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4083,7 +4040,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &1106740467
 RectTransform:
   m_ObjectHideFlags: 0
@@ -6676,6 +6633,7 @@ GameObject:
   - component: {fileID: 1739615153}
   - component: {fileID: 1739615154}
   - component: {fileID: 1739615155}
+  - component: {fileID: 1739615156}
   m_Layer: 0
   m_Name: Body
   m_TagString: Untagged
@@ -6734,6 +6692,11 @@ MonoBehaviour:
   altitudeText: {fileID: 1586750000}
   respawnText: {fileID: 1106740468}
   rb: {fileID: 1739615155}
+  followCamera: {fileID: 330585551}
+  groundLayer:
+    serializedVersion: 2
+    m_Bits: 1
+  aliveDetector: {fileID: 1739615156}
 --- !u!54 &1739615155
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -6760,7 +6723,27 @@ Rigidbody:
   m_IsKinematic: 0
   m_Interpolate: 1
   m_Constraints: 0
-  m_CollisionDetection: 1
+  m_CollisionDetection: 3
+--- !u!114 &1739615156
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1739615152}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dee6ba8debea4ab5818c530c03e58afb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  groundLayer:
+    serializedVersion: 2
+    m_Bits: 1
+  target: {fileID: 122354927}
+  groundCheckDistance: 2
+  maxAirTime: 5
+  isGrounded: 0
+  airTime: 0
 --- !u!1 &1769418362
 GameObject:
   m_ObjectHideFlags: 0

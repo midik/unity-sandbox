@@ -154,4 +154,11 @@ public class SmartFollowCamera : MonoBehaviour
                 break;
         }
     }
+    
+    public void ResetToTarget()
+    {
+        currentLookTarget = target.position + Vector3.up * 1f;
+        transform.position = currentLookTarget;
+        transform.LookAt(currentLookTarget);
+    }
 }

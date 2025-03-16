@@ -12,41 +12,86 @@ public class CarController : MonoBehaviour
     public TextMeshProUGUI respawnText;
     
     public Rigidbody rb;
-    
-    public bool isFallen { get; private set; } = false;
+    public SmartFollowCamera followCamera;
+    public LayerMask groundLayer;
+    public AliveDetector aliveDetector;
     
     private WheelCollider FL;
     private WheelCollider FR;
     private WheelCollider RL;
     private WheelCollider RR;
     
+    private Vector3 spawnPosition;
+    
+    private InputSystem_Actions inputActions;
+    private Vector2 moveInput;
+
     private void Start()
     {
         FL = wheels[0];
         FR = wheels[1];
         RL = wheels[2];
         RR = wheels[3];
+        
+        spawnPosition = transform.position;
+        respawnText.gameObject.SetActive(false);
     }
+    
+    void Awake()
+    {
+        inputActions = new InputSystem_Actions();
+        inputActions.Player.Move.performed += ctx => moveInput = ctx.ReadValue<Vector2>();
+        inputActions.Player.Move.canceled += ctx => moveInput = Vector2.zero;
+        inputActions.Player.Respawn.performed += ctx => Respawn();
+    }
+    
+    void OnEnable() => inputActions.Enable();
+    void OnDisable() => inputActions.Disable();
 
     void FixedUpdate()
     {
-        float motor = motorTorque * Input.GetAxis("Vertical");
-        float steering = steerAngle * Input.GetAxis("Horizontal");
+        if (aliveDetector.isDead)
+        {
+            speedText.text = "O_o";
+            respawnText.gameObject.SetActive(true);
+            Drive(0f, 0f);
+            return;
+        }
         
+        float motor = motorTorque * moveInput.y;
+        float steering = steerAngle * moveInput.x;
+        Drive(steering, motor);
+        
+        UpdateHud();
+    }
+
+    private void Drive(float steering, float motor)
+    {
         FL.steerAngle = steering;
         FR.steerAngle = steering;
-        
         FL.motorTorque = motor;
         RL.motorTorque = motor;
         RL.motorTorque = motor;
         RR.motorTorque = motor;
+    }
+
+    void Respawn()
+    {
+        // if (!aliveDetector.isDead) return;
         
-        UpdateHud();
+        rb.position = spawnPosition;
+        rb.linearVelocity = Vector3.zero;
+        rb.angularVelocity = Vector3.zero;
+        
+        respawnText.gameObject.SetActive(false);
+        followCamera.ResetToTarget();
+        
+        aliveDetector.recover();
     }
     
     void UpdateHud()
     {
-        if (isFallen) return;
+        if (aliveDetector.isDead) return;
 
         Vector3 horizontalVelocity = new Vector3(rb.linearVelocity.x, 0, rb.linearVelocity.z);
         float horizontalSpeed = horizontalVelocity.magnitude;

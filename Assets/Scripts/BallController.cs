@@ -7,7 +7,7 @@ public class BallController : MonoBehaviour
     public TextMeshProUGUI altitudeText;
     public TextMeshProUGUI respawnText;
 
-    public FollowCamera followCamera;
+    public SmartFollowCamera followCamera;
 
     public float jumpForce = 5f;
     public Transform cam;
