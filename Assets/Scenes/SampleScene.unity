@@ -15,7 +15,7 @@ RenderSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 10
   m_Fog: 0
-  m_FogColor: {r: 0.6980372, g: 0.6980372, b: 0.6980372, a: 1}
+  m_FogColor: {r: 0.31358653, g: 0.31358653, b: 0.31358653, a: 1}
   m_FogMode: 3
   m_FogDensity: 0.01
   m_LinearFogStart: 0
@@ -26,7 +26,7 @@ RenderSettings:
   m_AmbientIntensity: 1
   m_AmbientMode: 0
   m_SubtractiveShadowColor: {r: 0.42, g: 0.478, b: 0.627, a: 1}
-  m_SkyboxMaterial: {fileID: 2100000, guid: 254dcb60713c566a487b57dec26044dd, type: 2}
+  m_SkyboxMaterial: {fileID: 10304, guid: 0000000000000000f000000000000000, type: 0}
   m_HaloStrength: 0.5
   m_FlareStrength: 1
   m_FlareFadeSpeed: 3
@@ -582,7 +582,7 @@ WheelCollider:
     spring: 25000
     damper: 2000
     targetPosition: 0.5
-  m_SuspensionDistance: 0.8
+  m_SuspensionDistance: 1
   m_ForceAppPointDistance: 0
   m_Mass: 50
   m_WheelDampingRate: 0.15
@@ -786,7 +786,7 @@ Transform:
   m_GameObject: {fileID: 122354926}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 234.52, y: 3.2, z: 261.81}
+  m_LocalPosition: {x: 234.52, y: 3.5, z: 261.81}
   m_LocalScale: {x: 3, y: 1, z: 5}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -2164,7 +2164,7 @@ WheelCollider:
     spring: 25000
     damper: 2000
     targetPosition: 0.5
-  m_SuspensionDistance: 0.8
+  m_SuspensionDistance: 1
   m_ForceAppPointDistance: 0
   m_Mass: 50
   m_WheelDampingRate: 0.15
@@ -3726,7 +3726,7 @@ WheelCollider:
     spring: 25000
     damper: 2000
     targetPosition: 0.5
-  m_SuspensionDistance: 0.8
+  m_SuspensionDistance: 1
   m_ForceAppPointDistance: 0
   m_Mass: 50
   m_WheelDampingRate: 0.15
@@ -5307,7 +5307,7 @@ WheelCollider:
     spring: 25000
     damper: 2000
     targetPosition: 0.5
-  m_SuspensionDistance: 0.8
+  m_SuspensionDistance: 1
   m_ForceAppPointDistance: 0
   m_Mass: 50
   m_WheelDampingRate: 0.15
@@ -6650,7 +6650,7 @@ Transform:
   m_GameObject: {fileID: 1739615152}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 332.16, y: -0.64, z: 306.19}
+  m_LocalPosition: {x: 332.51, y: -0.72, z: 308.4}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -6739,10 +6739,10 @@ MonoBehaviour:
   groundLayer:
     serializedVersion: 2
     m_Bits: 1
-  target: {fileID: 122354927}
   groundCheckDistance: 2
   maxAirTime: 5
   isGrounded: 0
+  frame: {fileID: 122354927}
   airTime: 0
 --- !u!1 &1769418362
 GameObject:

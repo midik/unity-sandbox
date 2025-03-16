@@ -4,10 +4,10 @@ public class AliveDetector : MonoBehaviour
 {
     public bool isDead { get; private set; } = false;
     public LayerMask groundLayer;
-    public Transform target;
     public float groundCheckDistance = 2f;
     public float maxAirTime = 5f;
     public bool isGrounded;
+    public Transform frame;
 
     // settiings
     public float airTime = 0f;
@@ -17,8 +17,8 @@ public class AliveDetector : MonoBehaviour
     private void FixedUpdate()
     {
         // Проверка на землю
-        isGrounded = Physics.Raycast(target.position, Vector3.down, groundCheckDistance, groundLayer);
-        // Debug.DrawRay (target.position, transform.down*2f, Color.yellow,1,true);
+        isGrounded = Physics.Raycast(frame.position, -frame.up, groundCheckDistance, groundLayer);
+        // Debug.DrawRay (frame.position, frame.down*groundCheckDistance, Color.yellow,1,true);
 
         // Подсчет времени в воздухе
         if (!isGrounded) airTime += Time.fixedDeltaTime;

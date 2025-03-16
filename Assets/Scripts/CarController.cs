@@ -22,6 +22,7 @@ public class CarController : MonoBehaviour
     private WheelCollider RR;
     
     private Vector3 spawnPosition;
+    private Vector3 spawnRotation;
     
     private InputSystem_Actions inputActions;
     private Vector2 moveInput;
@@ -34,7 +35,10 @@ public class CarController : MonoBehaviour
         RR = wheels[3];
         
         spawnPosition = transform.position;
+        spawnRotation = transform.rotation.eulerAngles;
         respawnText.gameObject.SetActive(false);
+        
+        aliveDetector = GetComponent<AliveDetector>();
     }
     
     void Awake()
@@ -77,16 +81,19 @@ public class CarController : MonoBehaviour
 
     void Respawn()
     {
-        // if (!aliveDetector.isDead) return;
+        transform.position = spawnPosition + Vector3.up * 0.5f;
+        transform.rotation = Quaternion.Euler(spawnRotation);
         
-        rb.position = spawnPosition;
         rb.linearVelocity = Vector3.zero;
         rb.angularVelocity = Vector3.zero;
-        
-        respawnText.gameObject.SetActive(false);
-        followCamera.ResetToTarget();
-        
+        Drive(0f, 0f);
+
         aliveDetector.recover();
+
+        followCamera.ResetToTarget();
+
+        respawnText.gameObject.SetActive(false);
+        // ResetWheelColliders();
     }
     
     void UpdateHud()
