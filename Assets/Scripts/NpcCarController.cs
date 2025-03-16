@@ -95,6 +95,7 @@ public class NpcCarController : MonoBehaviour
         logger.Log("NPC respawn started");
         frame.position = spawnPosition + Vector3.up * 0.5f;
         frame.rotation = Quaternion.Euler(spawnRotation);
+        
         rb.linearVelocity = Vector3.zero;
         rb.angularVelocity = Vector3.zero;
         Drive(0f, 0f);

@@ -4,7 +4,7 @@ public class WheelVisualizerAndCollider : MonoBehaviour
 {
     public WheelCollider wheelCollider; // WheelCollider
     public Transform wheelMesh; // Визуал колеса
-    public CapsuleCollider collisionCollider; // Физический коллайдер (Capsule)
+    public CapsuleCollider capsuleCollider; // Физический коллайдер (Capsule)
 
     void LateUpdate()
     {
@@ -14,8 +14,8 @@ public class WheelVisualizerAndCollider : MonoBehaviour
         wheelMesh.position = pos;
         wheelMesh.rotation = rot;
 
-        // Обновляем Capsule Collider для коллизий
-        collisionCollider.transform.position = pos;
-        collisionCollider.transform.rotation = rot;
+        // Обновляем collider для коллизий
+        capsuleCollider.transform.position = pos;
+        capsuleCollider.transform.rotation = rot;
     }
 }
