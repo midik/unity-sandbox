@@ -1,21 +1,26 @@
+using TMPro;
 using UnityEngine;
 
 public class CameraCompass : MonoBehaviour
 {
+    public Transform player;
+    public Transform npc;
+
     public RectTransform compassArrow; // UI Image стрелка
-    public Transform cameraTransform;  // Ссылка на Main Camera
+    public TextMeshProUGUI distanceText; // UI Text расстояние
 
     void Update()
     {
-        // Получаем направление взгляда камеры по XZ (без высоты)
-        Vector3 forward = cameraTransform.forward;
-        forward.y = 0;
-        forward.Normalize();
+        // Получаем направление между игроком и NPC
+        Vector3 direction = npc.position - player.position;
+        direction.Normalize();
 
-        // Угол относительно мировой оси Z
-        float angle = Mathf.Atan2(forward.x, forward.z) * Mathf.Rad2Deg;
-
-        // Вращаем стрелку
+        // Угол между направлением игрока и направлением на NPC
+        float angle = Vector3.SignedAngle(player.forward, direction, Vector3.up);
         compassArrow.localEulerAngles = new Vector3(0, 0, -angle);
+
+        // Расстояние между игроком и NPC
+        float distance = Vector3.Distance(player.position, npc.position);
+        distanceText.text = distance.ToString("F0") + "m";
     }
 }

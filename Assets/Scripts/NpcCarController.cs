@@ -4,7 +4,9 @@ using UnityEngine;
 public class NpcCarController : MonoBehaviour
 {
     public Transform target; // Цель (игрок)
+    public Transform frame;
     public WheelCollider[] wheels; // 4 коллайдера
+    
     public float motorTorque = 1000f;
     public float steerAngle = 30f;
     public float maxSpeed = 20f;
@@ -29,8 +31,8 @@ public class NpcCarController : MonoBehaviour
         RL = wheels[2];
         RR = wheels[3];
         
-        spawnPosition = transform.position;
-        spawnRotation = transform.rotation.eulerAngles;
+        spawnPosition = frame.position;
+        spawnRotation = frame.rotation.eulerAngles;
     }
 
     void FixedUpdate()
@@ -45,14 +47,14 @@ public class NpcCarController : MonoBehaviour
         }
 
         // Вектор к цели
-        Vector3 toTarget = target.position - transform.position;
+        Vector3 toTarget = target.position - frame.position;
         toTarget.y = 0f;
         
-        Debug.DrawRay(transform.position, toTarget.normalized * 10, Color.green); // цель
-        Debug.DrawRay(transform.position, transform.forward * 10, Color.red); // морда
+        Debug.DrawRay(frame.position, toTarget.normalized * 10, Color.green); // цель
+        Debug.DrawRay(frame.position, frame.forward * 10, Color.red); // морда
 
         // Угол между forward и направлением на цель
-        float angle = Vector3.SignedAngle(transform.forward, toTarget, Vector3.up);
+        float angle = Vector3.SignedAngle(frame.forward, toTarget, Vector3.up);
 
         // Поворот колес (-1 до 1)
         float steer = Mathf.Clamp(angle / 45f, -1f, 1f) * steerAngle;
@@ -86,8 +88,8 @@ public class NpcCarController : MonoBehaviour
     public void Respawn()
     {
         logger.Log("NPC respawn started");
-        transform.position = spawnPosition + Vector3.up * 0.5f;
-        transform.rotation = Quaternion.Euler(spawnRotation);
+        frame.position = spawnPosition + Vector3.up * 0.5f;
+        frame.rotation = Quaternion.Euler(spawnRotation);
         rb.linearVelocity = Vector3.zero;
         rb.angularVelocity = Vector3.zero;
         Drive(0f, 0f);
