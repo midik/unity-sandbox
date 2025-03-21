@@ -3204,7 +3204,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   terrain: {fileID: 718181260}
-  texture: {fileID: 2800000, guid: 3d6ea8373013b3546a620f84802e06f6, type: 3}
+  texture: {fileID: 10309, guid: 0000000000000000f000000000000000, type: 0}
   width: 512
   height: 512
   maxHeight: 60
@@ -3636,9 +3636,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   terrain: {fileID: 718181260}
-  deformRadius: 0.05
+  deformRadius: 0.001
   deformAmount: 0.1
-  maxDeformDepth: 0.005
+  maxDeformDepth: 0.001
 --- !u!1 &697379495
 GameObject:
   m_ObjectHideFlags: 0
@@ -8282,9 +8282,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   terrain: {fileID: 718181260}
-  deformRadius: 0.05
+  deformRadius: 0.001
   deformAmount: 0.1
-  maxDeformDepth: 0.005
+  maxDeformDepth: 0.001
 --- !u!1 &1849467022
 GameObject:
   m_ObjectHideFlags: 0
@@ -9040,9 +9040,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   terrain: {fileID: 718181260}
-  deformRadius: 0.05
+  deformRadius: 0.001
   deformAmount: 0.1
-  maxDeformDepth: 0.005
+  maxDeformDepth: 0.001
 --- !u!1 &1993750329
 GameObject:
   m_ObjectHideFlags: 0
@@ -9452,9 +9452,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   terrain: {fileID: 718181260}
-  deformRadius: 0.05
+  deformRadius: 0.001
   deformAmount: 0.1
-  maxDeformDepth: 0.005
+  maxDeformDepth: 0.001
 --- !u!1 &2065825928
 GameObject:
   m_ObjectHideFlags: 0
