@@ -785,8 +785,8 @@ Transform:
   m_GameObject: {fileID: 122354926}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 234.52, y: 3.3, z: 261.81}
-  m_LocalScale: {x: 3, y: 1, z: 8.7300005}
+  m_LocalPosition: {x: 234.52, y: 3.3, z: 261.65}
+  m_LocalScale: {x: 3, y: 1, z: 5.8836904}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 1739615153}
@@ -1518,8 +1518,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
-  m_LocalRotation: {x: -0.20698264, y: -0.45307297, z: 0.10921094, w: -0.8602071}
-  m_LocalPosition: {x: 234.89493, y: 11.480976, z: 232.58618}
+  m_LocalRotation: {x: 0.24837628, y: 0.48156345, z: -0.14446035, w: 0.8279717}
+  m_LocalPosition: {x: 233.63802, y: 12.434351, z: 231.87117}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -3217,6 +3217,7 @@ MonoBehaviour:
   numValleys: 2
   valleyDepth: 0.8
   valleyWidth: 10
+  minHeightOffset: 0.1
 --- !u!4 &499586884
 Transform:
   m_ObjectHideFlags: 0
@@ -3635,9 +3636,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   terrain: {fileID: 718181260}
-  deformRadius: 0.1
-  deformStrength: 0.001
-  deformAmount: 0.001
+  deformRadius: 0.05
+  deformAmount: 0.1
+  maxDeformDepth: 0.005
 --- !u!1 &697379495
 GameObject:
   m_ObjectHideFlags: 0
@@ -4239,7 +4240,7 @@ Transform:
   m_GameObject: {fileID: 1000844537}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 11.2, y: 0, z: -3.9}
+  m_LocalPosition: {x: 11.2, y: 4.73, z: -3.9}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -7814,7 +7815,7 @@ Transform:
   m_GameObject: {fileID: 1739615152}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 13.610003, y: -1.71, z: -25.700014}
+  m_LocalPosition: {x: 13.610003, y: 4.44, z: -25.700014}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -8281,9 +8282,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   terrain: {fileID: 718181260}
-  deformRadius: 0.1
-  deformStrength: 0.001
-  deformAmount: 0.001
+  deformRadius: 0.05
+  deformAmount: 0.1
+  maxDeformDepth: 0.005
 --- !u!1 &1849467022
 GameObject:
   m_ObjectHideFlags: 0
@@ -9039,9 +9040,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   terrain: {fileID: 718181260}
-  deformRadius: 0.1
-  deformStrength: 0.001
-  deformAmount: 0.001
+  deformRadius: 0.05
+  deformAmount: 0.1
+  maxDeformDepth: 0.005
 --- !u!1 &1993750329
 GameObject:
   m_ObjectHideFlags: 0
@@ -9451,9 +9452,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   terrain: {fileID: 718181260}
-  deformRadius: 0.1
-  deformStrength: 0.001
-  deformAmount: 0.001
+  deformRadius: 0.05
+  deformAmount: 0.1
+  maxDeformDepth: 0.005
 --- !u!1 &2065825928
 GameObject:
   m_ObjectHideFlags: 0
@@ -9510,7 +9511,7 @@ Transform:
   m_GameObject: {fileID: 2065825928}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 13.610003, y: -1.71, z: -9.55002}
+  m_LocalPosition: {x: 13.610003, y: 4.44, z: -9.55002}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -9556,7 +9557,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2065825928}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0fba9bc13bfda19a28e3eda514473697, type: 3}
   m_Name: 

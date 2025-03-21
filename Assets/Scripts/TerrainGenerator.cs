@@ -19,12 +19,14 @@ public class TerrainGenerator : MonoBehaviour
     public int numValleys = 3;
     public float valleyDepth = 0.3f; // глубина долины
     public float valleyWidth = 0.8f; // "размазанность" долины
-
+    public float minHeightOffset = 0.1f; // Минимальная базовая высота
+    
 
     void Start()
     {
         // TerrainData data = new TerrainData();
         terrain.terrainData = terrainData; // назначить сразу
+        terrain.terrainData.heightmapResolution = 2049;
         GenerateTerrain(terrainData);
         AddTexture(terrainData);
         terrain.Flush();
@@ -68,7 +70,7 @@ public class TerrainGenerator : MonoBehaviour
                 float valleyEffect = radialValley * valleyDepth;
 
                 // --- Итоговая высота с учетом долин ---
-                heights[x, y] = Mathf.Max(0, finalHeight - valleyEffect);
+                heights[x, y] = Mathf.Max(minHeightOffset, finalHeight - valleyEffect);
             }
         }
 
@@ -91,9 +93,4 @@ public class TerrainGenerator : MonoBehaviour
     {
         Start();
     }
-    
-    // void OnValidate()
-    // {
-    //     Start(); // автоматически генерировать при изменениях параметров
-    // }
 }

@@ -4,70 +4,101 @@ public class TerrainDeformer : MonoBehaviour
 {
     public Terrain terrain;
     public float deformRadius = 0.05f; // Радиус вмятины
-    public float deformStrength = 0.1f; // Глубина вмятины
-    public float deformAmount = 0.2f; // Максимальная глубина вмятины
+    // public float deformStrength = 0.1f; // Глубина вмятины
+    public float deformAmount = 0.1f; // Максимальная глубина вмятины
+    public float maxDeformDepth = 0.005f; // Максимальная глубина проминания (в норм. координатах)
 
     private TerrainData terrainData;
     private int heightmapResolution;
 
-    private float[,] initialHeights;
-    
+    private float[,] initialHeights; // Базовый (неизменяемый) рельеф
+    private float[,] deformableLayer; // Проминаемый слой
+
 
     void Start()
     {
         terrainData = terrain.terrainData;
         heightmapResolution = terrainData.heightmapResolution;
-        
-        initialHeights = terrainData.GetHeights(0, 0, terrainData.heightmapResolution, terrainData.heightmapResolution);
+
+        initialHeights = terrainData.GetHeights(0, 0, heightmapResolution, heightmapResolution);
+        deformableLayer = new float[heightmapResolution, heightmapResolution];
+
+        // Начальный "проминаемый слой" – пустой (без деформации)
+        for (int x = 0; x < heightmapResolution; x++)
+        {
+            for (int z = 0; z < heightmapResolution; z++)
+            {
+                deformableLayer[x, z] = 0f; // Нет проминания в начале
+            }
+        }
     }
 
-    public void DeformAtPoint(Vector3 worldPos)
+
+    public void DeformAtPoint(Vector3 worldPos, float wheelRPM, float wheelMass)
     {
         Vector3 terrainPos = WorldToTerrainPosition(worldPos);
 
-        int posXInTerrain = (int)(terrainPos.x * heightmapResolution);
-        int posZInTerrain = (int)(terrainPos.z * heightmapResolution);
+        int posXInTerrain = Mathf.RoundToInt(terrainPos.x * heightmapResolution);
+        int posZInTerrain = Mathf.RoundToInt(terrainPos.z * heightmapResolution);
 
         int deformRadiusInHeights = Mathf.RoundToInt(deformRadius / terrainData.size.x * heightmapResolution);
 
-        // Получаем участок высот
-        int startX = Mathf.Clamp(posXInTerrain - deformRadiusInHeights / 2, 0, heightmapResolution);
-        int startZ = Mathf.Clamp(posZInTerrain - deformRadiusInHeights / 2, 0, heightmapResolution);
-
+        int startX = Mathf.Clamp(posXInTerrain - deformRadiusInHeights / 2, 0, heightmapResolution - 1);
+        int startZ = Mathf.Clamp(posZInTerrain - deformRadiusInHeights / 2, 0, heightmapResolution - 1);
+    
         int width = Mathf.Clamp(deformRadiusInHeights, 1, heightmapResolution - startX);
         int height = Mathf.Clamp(deformRadiusInHeights, 1, heightmapResolution - startZ);
 
-        float[,] heights = terrainData.GetHeights(startX, startZ, width, height);
+        // Зависимость от нагрузки на колесо (массы и скорости)
+        float baseDeform = deformAmount / terrainData.size.y;
+        float speedFactor = Mathf.Clamp01(wheelRPM / 500f);  // Нормируем: 0 (0 об/мин) - 1 (500 об/мин)
+        float weightFactor = Mathf.Clamp01(wheelMass / 1500f); // Нормируем: 0 - легкая машина, 1 - тяжелая
+        float normalizedDeform = baseDeform * (0.5f + speedFactor * 0.3f + weightFactor * 0.2f);
 
-        // Меняем высоты (делаем вмятину)
-        
+        // Debug.Log($"Deform -> RPM: {wheelRPM}, Mass: {wheelMass}, Deform: {normalizedDeform}");
+
         for (int i = 0; i < width; i++)
         {
             for (int j = 0; j < height; j++)
             {
-                float currentHeight = heights[j, i];
-                float minHeight = initialHeights[j, i] - deformAmount;
-                if (currentHeight > minHeight) {
-                    heights[j, i] -= deformAmount;
-                }
-                float dist = Vector2.Distance(new Vector2(i, j), new Vector2(width / 2, height / 2)) / (width / 2);
-                float strength = Mathf.Clamp01(1 - dist); // Сила уменьшается к краю
-                heights[j, i] -= deformStrength * strength;
-                heights[j, i] = Mathf.Clamp01(heights[j, i]);
+                deformableLayer[startX + i, startZ + j] = Mathf.Min(
+                    deformableLayer[startX + i, startZ + j] + normalizedDeform, 
+                    maxDeformDepth
+                );
             }
         }
 
-        // Записываем обратно
-        terrainData.SetHeights(startX, startZ, heights);
+        // Обновляем карту высот
+        float[,] newHeights = new float[width, height];
+
+        for (int i = 0; i < width; i++)
+        {
+            for (int j = 0; j < height; j++)
+            {
+                newHeights[i, j] = initialHeights[startX + i, startZ + j] - deformableLayer[startX + i, startZ + j];
+            }
+        }
+
+        terrainData.SetHeights(startX, startZ, newHeights);
+    }
+
+
+    public void Update()
+    {
+        // Debug.Log(transform.position.y);
     }
 
     private Vector3 WorldToTerrainPosition(Vector3 worldPos)
     {
         Vector3 terrainPos = worldPos - terrain.transform.position;
-        return new Vector3(
+        Vector3 normalizedPos = new Vector3(
             terrainPos.x / terrainData.size.x,
             0,
             terrainPos.z / terrainData.size.z
         );
+
+        // Debug.Log($"WorldPos: {worldPos}, TerrainPos: {terrainPos}, Normalized: {normalizedPos}");
+
+        return normalizedPos;
     }
 }
