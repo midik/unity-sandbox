@@ -25,8 +25,8 @@ public class TerrainGenerator : MonoBehaviour
     void Start()
     {
         // TerrainData data = new TerrainData();
+        terrainData.heightmapResolution = 2049;
         terrain.terrainData = terrainData; // назначить сразу
-        terrain.terrainData.heightmapResolution = 2049;
         GenerateTerrain(terrainData);
         AddTexture(terrainData);
         terrain.Flush();
