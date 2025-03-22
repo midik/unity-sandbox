@@ -5,11 +5,14 @@ public class WheelVisualizerAndCollider : MonoBehaviour
     public WheelCollider wheelCollider; // WheelCollider
     public Transform wheelMesh; // Визуал колеса
     public CapsuleCollider capsuleCollider; // Физический коллайдер (Capsule)
-    public MeshDeformer meshDeformer;
     
-    // public TerrainDeformer terrainDeformer;
-    // public LayerMask groundLayer;
+    private ChunkDeformerManager chunkDeformerManager;
     
+    void Start()
+    {
+        chunkDeformerManager = GetComponent<ChunkDeformerManager>();
+    }
+   
     void LateUpdate()
     {
         wheelCollider.GetWorldPose(out Vector3 pos, out Quaternion rot);
@@ -23,31 +26,15 @@ public class WheelVisualizerAndCollider : MonoBehaviour
         capsuleCollider.transform.rotation = rot;
     }
 
-    // void FixedUpdate()
-    // {
-    //     RaycastHit hit;
-    //     if (Physics.Raycast(wheelMesh.position, Vector3.down, out hit, 5f, groundLayer))
-    //     {
-    //         Vector3 wheelForward = wheelMesh.forward;  // Направление оси колеса
-    //         float direction = Mathf.Sign(wheelCollider.rpm); // 1 = вперед, -1 = назад
-    //         float wheelRadius = wheelCollider.radius;
-    //
-    //         // Смещаем точку в сторону движения колеса
-    //         Vector3 adjustedPoint = hit.point + (wheelForward * (direction * wheelRadius * 0.3f));
-    //
-    //         // Передаем в деформер уже скорректированную точку
-    //         terrainDeformer.DeformAtPoint(adjustedPoint, wheelCollider.rpm, wheelCollider.attachedRigidbody.mass);
-    //     }
-    // }
-    
     void FixedUpdate()
     {
         RaycastHit hit;
         if (Physics.Raycast(wheelMesh.position, Vector3.down, out hit, 5f))
         {
-            meshDeformer.DeformAtPoint(hit.point);
+            if (chunkDeformerManager)
+            {
+                chunkDeformerManager.DeformAtWorldPoint(hit.point);
+            }
         }
     }
-
-
 }

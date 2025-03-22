@@ -11,7 +11,8 @@ public class MeshDeformer : MonoBehaviour
 
     void Start()
     {
-        mesh = GetComponent<MeshFilter>().mesh;
+        mesh = GetComponentInChildren<MeshFilter>().mesh;
+        
         vertices = mesh.vertices;
         originalVertices = mesh.vertices.Clone() as Vector3[];
     }

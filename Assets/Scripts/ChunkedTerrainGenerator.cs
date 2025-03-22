@@ -5,10 +5,10 @@ public class ChunkedTerrainGenerator : MonoBehaviour
     [Header("Chunk Settings")]
     public int chunksX = 4;
     public int chunksZ = 4;
-    public int resolutionPerChunk = 32;
+    public int resolutionPerChunk = 64;
     public float sizePerChunk = 10;
     public float maxHeight = 2;
-    public float perlinScale = 10f;
+    public float perlinScale = 300f;
     public Material terrainMaterial;
 
     void Start()
@@ -16,8 +16,11 @@ public class ChunkedTerrainGenerator : MonoBehaviour
         GenerateChunks();
     }
 
+    [ContextMenu("Generate")]
     void GenerateChunks()
     {
+        ClearChunks();
+        
         for (int z = 0; z < chunksZ; z++)
         {
             for (int x = 0; x < chunksX; x++)
@@ -36,6 +39,9 @@ public class ChunkedTerrainGenerator : MonoBehaviour
         MeshFilter mf = chunk.AddComponent<MeshFilter>();
         MeshRenderer mr = chunk.AddComponent<MeshRenderer>();
         MeshCollider mc = chunk.AddComponent<MeshCollider>();
+        
+        chunk.AddComponent<MeshDeformer>();
+        // todo set deformRadius/deformStrength here
 
         mr.material = terrainMaterial;
 
@@ -78,4 +84,13 @@ public class ChunkedTerrainGenerator : MonoBehaviour
         mf.mesh = mesh;
         mc.sharedMesh = mesh;
     }
+    [ContextMenu("Clear")]
+    void ClearChunks()
+    {
+        for (int i = transform.childCount - 1; i >= 0; i--)
+        {
+            DestroyImmediate(transform.GetChild(i).gameObject);
+        }
+    }
+
 }
