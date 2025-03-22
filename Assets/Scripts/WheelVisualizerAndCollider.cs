@@ -5,6 +5,7 @@ public class WheelVisualizerAndCollider : MonoBehaviour
     public WheelCollider wheelCollider; // WheelCollider
     public Transform wheelMesh; // Визуал колеса
     public CapsuleCollider capsuleCollider; // Физический коллайдер (Capsule)
+    public MeshDeformer meshDeformer;
     
     // public TerrainDeformer terrainDeformer;
     // public LayerMask groundLayer;
@@ -39,14 +40,14 @@ public class WheelVisualizerAndCollider : MonoBehaviour
     //     }
     // }
     
-    // void FixedUpdate()
-    // {
-    //     RaycastHit hit;
-    //     if (Physics.Raycast(wheelMesh.position, Vector3.down, out hit, 5f))
-    //     {
-    //         terrain.GetComponent<MeshDeformer>().DeformAtPoint(hit.point);
-    //     }
-    // }
+    void FixedUpdate()
+    {
+        RaycastHit hit;
+        if (Physics.Raycast(wheelMesh.position, Vector3.down, out hit, 5f))
+        {
+            meshDeformer.DeformAtPoint(hit.point);
+        }
+    }
 
 
 }
