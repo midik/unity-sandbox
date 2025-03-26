@@ -1,4 +1,6 @@
 using UnityEngine;
+using System;
+
 
 public class ChunkedTerrainGenerator : MonoBehaviour
 {
@@ -9,7 +11,13 @@ public class ChunkedTerrainGenerator : MonoBehaviour
     public float sizePerChunk = 10;
     public float maxHeight = 2;
     public float perlinScale = 300f;
+    public float deformRadius = 0.4f;
+    public float deformStrength = 0.1f;
+    public float maxDeformDepth = 0.3f;
     public Material terrainMaterial;
+    public PhysicsMaterial physicsMaterial;
+    public static event Action OnChunksRegenerated;
+    
 
     void Start()
     {
@@ -20,7 +28,7 @@ public class ChunkedTerrainGenerator : MonoBehaviour
     void GenerateChunks()
     {
         ClearChunks();
-        
+
         for (int z = 0; z < chunksZ; z++)
         {
             for (int x = 0; x < chunksX; x++)
@@ -28,22 +36,32 @@ public class ChunkedTerrainGenerator : MonoBehaviour
                 GenerateChunk(x, z);
             }
         }
+
+        OnChunksRegenerated?.Invoke(); // 🔔 оповестим всех
     }
 
     void GenerateChunk(int chunkX, int chunkZ)
     {
         GameObject chunk = new GameObject($"Chunk_{chunkX}_{chunkZ}");
+        chunk.layer = LayerMask.NameToLayer("TerrainChunk");
+
         chunk.transform.parent = transform;
         chunk.transform.position = new Vector3(chunkX * sizePerChunk, 0, chunkZ * sizePerChunk);
 
         MeshFilter mf = chunk.AddComponent<MeshFilter>();
-        MeshRenderer mr = chunk.AddComponent<MeshRenderer>();
-        MeshCollider mc = chunk.AddComponent<MeshCollider>();
-        
-        chunk.AddComponent<MeshDeformer>();
-        // todo set deformRadius/deformStrength here
 
+        MeshRenderer mr = chunk.AddComponent<MeshRenderer>();
         mr.material = terrainMaterial;
+        
+        MeshCollider mc = chunk.AddComponent<MeshCollider>();
+        mc.material = physicsMaterial;
+
+        MeshDeformer md = chunk.AddComponent<MeshDeformer>();
+        md.deformRadius = deformRadius;
+        md.deformStrength = deformStrength;
+        md.maxDeformDepth = maxDeformDepth; 
+
+        chunk.AddComponent<ChunkDeformerManager>();
 
         Mesh mesh = new Mesh();
         int vertsPerLine = resolutionPerChunk + 1;

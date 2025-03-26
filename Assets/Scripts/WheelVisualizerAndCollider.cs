@@ -1,4 +1,7 @@
 using UnityEngine;
+using System;
+using Object = UnityEngine.Object;
+
 
 public class WheelVisualizerAndCollider : MonoBehaviour
 {
@@ -6,11 +9,15 @@ public class WheelVisualizerAndCollider : MonoBehaviour
     public Transform wheelMesh; // Визуал колеса
     public CapsuleCollider capsuleCollider; // Физический коллайдер (Capsule)
     
-    private ChunkDeformerManager chunkDeformerManager;
-    
+    private LayerMask groundLayer;
+    private ChunkDeformerManager[] chunkDeformers;
+
     void Start()
     {
-        chunkDeformerManager = GetComponent<ChunkDeformerManager>();
+        groundLayer = LayerMask.GetMask("TerrainChunk");
+        
+        // Один раз собираем все ChunkDeformerManager в сцене
+        chunkDeformers = Object.FindObjectsByType<ChunkDeformerManager>(FindObjectsSortMode.None);
     }
    
     void LateUpdate()
@@ -28,13 +35,29 @@ public class WheelVisualizerAndCollider : MonoBehaviour
 
     void FixedUpdate()
     {
-        RaycastHit hit;
-        if (Physics.Raycast(wheelMesh.position, Vector3.down, out hit, 5f))
+        if (Physics.Raycast(wheelMesh.position, Vector3.down, out RaycastHit hit, 5f, groundLayer))
         {
-            if (chunkDeformerManager)
+            foreach (var chunk in chunkDeformers)
             {
-                chunkDeformerManager.DeformAtWorldPoint(hit.point);
+                chunk.DeformAtWorldPoint(hit.point);
             }
         }
     }
+    
+    private void OnEnable()
+    {
+        ChunkedTerrainGenerator.OnChunksRegenerated += RefreshDeformerList;
+        RefreshDeformerList(); // при запуске сцены
+    }
+
+    private void OnDisable()
+    {
+        ChunkedTerrainGenerator.OnChunksRegenerated -= RefreshDeformerList;
+    }
+
+    private void RefreshDeformerList()
+    {
+        chunkDeformers = FindObjectsByType<ChunkDeformerManager>(FindObjectsSortMode.None);
+    }
+
 }

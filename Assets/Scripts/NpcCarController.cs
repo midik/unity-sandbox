@@ -55,8 +55,8 @@ public class NpcCarController : MonoBehaviour
         Vector3 toTarget = target.position - frame.position;
         toTarget.y = 0f;
         
-        Debug.DrawRay(frame.position, toTarget.normalized * 10, Color.green); // цель
-        Debug.DrawRay(frame.position, frame.forward * 10, Color.red); // морда
+        // Debug.DrawRay(frame.position, toTarget.normalized * 10, Color.green); // цель
+        // Debug.DrawRay(frame.position, frame.forward * 10, Color.red); // морда
 
         // Угол между forward и направлением на цель
         float angle = Vector3.SignedAngle(frame.forward, toTarget, Vector3.up);
