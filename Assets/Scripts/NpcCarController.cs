@@ -5,14 +5,12 @@ public class NpcCarController : MonoBehaviour
 {
     public Transform target; // Цель (игрок)
     public Transform frame;
-    public WheelCollider[] wheels; // 4 коллайдера
     
     public float motorTorque = 1000f;
     public float steerAngle = 30f;
     public float maxSpeed = 20f;
     public float stopDistance = 15f; // расстояние, когда NPC "доволен"
 
-    public Rigidbody rb;
     public AliveDetector aliveDetector;
     public Logger logger;
 
@@ -20,6 +18,8 @@ public class NpcCarController : MonoBehaviour
     private WheelCollider FR;
     private WheelCollider RL;
     private WheelCollider RR;
+    
+    private Rigidbody rb;
 
     private Vector3 spawnPosition;
     private Vector3 spawnRotation;
@@ -29,10 +29,12 @@ public class NpcCarController : MonoBehaviour
 
     void Start()
     {
-        FL = wheels[0];
-        FR = wheels[1];
-        RL = wheels[2];
-        RR = wheels[3];
+        FL = transform.Find("Wheel FL").GetComponent<WheelCollider>();
+        FR = transform.Find("Wheel FR").GetComponent<WheelCollider>();
+        RL = transform.Find("Wheel RL").GetComponent<WheelCollider>();
+        RR = transform.Find("Wheel RR").GetComponent<WheelCollider>();
+        
+        rb = GetComponent<Rigidbody>();
         
         spawnPosition = frame.position;
         spawnRotation = frame.rotation.eulerAngles;
@@ -101,7 +103,7 @@ public class NpcCarController : MonoBehaviour
         frame.position = spawnPosition + Vector3.up * 0.5f;
         frame.rotation = Quaternion.Euler(spawnRotation);
 
-        aliveDetector.recover();
+        aliveDetector.Recover();
         isRespawnPending = false;
         logger.Log("NPC respawn completed");
     }

@@ -6,11 +6,11 @@ public class AliveDetector : MonoBehaviour
     public LayerMask groundLayer;
     public float groundCheckDistance = 2f;
     public float maxAirTime = 5f;
-    public bool isGrounded;
     public Transform frame;
 
     // settiings
     public float airTime = 0f;
+    private bool isGrounded;
     private float absoluteFallThreshold = -200f;
     
     
@@ -28,7 +28,7 @@ public class AliveDetector : MonoBehaviour
         isDead = airTime > maxAirTime || transform.position.y < absoluteFallThreshold;
     }
 
-    public void recover()
+    public void Recover()
     {
         airTime = 0f;
         isDead = false;

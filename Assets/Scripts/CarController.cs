@@ -3,16 +3,15 @@ using UnityEngine;
 
 public class CarController : MonoBehaviour
 {
-    public WheelCollider[] wheels; // Передать 4 коллайдера
+    // public WheelCollider[] wheels; // Передать 4 коллайдера
     public float motorTorque = 1500f;
     public float steerAngle = 30f;
     
     public TextMeshProUGUI speedText;
     public TextMeshProUGUI respawnText;
+    public TextMeshProUGUI drivetrainText;
     
-    public Rigidbody rb;
     public SmartFollowCamera followCamera;
-    public LayerMask groundLayer;
     public AliveDetector aliveDetector;
     
     private WheelCollider FL;
@@ -20,18 +19,25 @@ public class CarController : MonoBehaviour
     private WheelCollider RL;
     private WheelCollider RR;
     
+    private Rigidbody rb;
+    
     private Vector3 spawnPosition;
     private Vector3 spawnRotation;
     
     private InputSystem_Actions inputActions;
     private Vector2 moveInput;
+    
+    private enum DrivetrainMode { AWD, FWD, RWD }
+    private DrivetrainMode drivetrainMode;
 
     private void Start()
     {
-        FL = wheels[0];
-        FR = wheels[1];
-        RL = wheels[2];
-        RR = wheels[3];
+        FL = transform.Find("Wheel FL").GetComponent<WheelCollider>();
+        FR = transform.Find("Wheel FR").GetComponent<WheelCollider>();
+        RL = transform.Find("Wheel RL").GetComponent<WheelCollider>();
+        RR = transform.Find("Wheel RR").GetComponent<WheelCollider>();
+        
+        rb = GetComponent<Rigidbody>();
         
         spawnPosition = transform.position;
         spawnRotation = transform.rotation.eulerAngles;
@@ -46,6 +52,11 @@ public class CarController : MonoBehaviour
         inputActions.Player.Move.performed += ctx => moveInput = ctx.ReadValue<Vector2>();
         inputActions.Player.Move.canceled += ctx => moveInput = Vector2.zero;
         inputActions.Player.Respawn.performed += ctx => Respawn();
+        inputActions.Player.ToggleDrivetrainMode.performed += ctx =>
+        {
+            drivetrainMode++;
+            if (drivetrainMode > DrivetrainMode.RWD) drivetrainMode = 0;
+        };
     }
     
     void OnEnable() => inputActions.Enable();
@@ -72,27 +83,32 @@ public class CarController : MonoBehaviour
     {
         FL.steerAngle = steering;
         FR.steerAngle = steering;
-        FL.motorTorque = motor;
-        RL.motorTorque = motor;
-        RL.motorTorque = motor;
-        RR.motorTorque = motor;
+        
+        if (drivetrainMode == DrivetrainMode.FWD || drivetrainMode == DrivetrainMode.AWD)
+        {
+            FL.motorTorque = motor;
+            FR.motorTorque = motor;
+        }
+        if (drivetrainMode == DrivetrainMode.RWD || drivetrainMode == DrivetrainMode.AWD)
+        {
+            RL.motorTorque = motor;
+            RR.motorTorque = motor;
+        }
     }
 
     void Respawn()
     {
         rb.linearVelocity = Vector3.zero;
         rb.angularVelocity = Vector3.zero;
-        // Drive(0f, 0f);
         
         transform.position = spawnPosition + Vector3.up * 0.5f;
         transform.rotation = Quaternion.Euler(spawnRotation);
 
-        aliveDetector.recover();
+        aliveDetector.Recover();
 
         followCamera.ResetToTarget();
 
         respawnText.gameObject.SetActive(false);
-        // ResetWheelColliders();
     }
     
     void UpdateHud()
@@ -101,6 +117,7 @@ public class CarController : MonoBehaviour
 
         Vector3 horizontalVelocity = new Vector3(rb.linearVelocity.x, 0, rb.linearVelocity.z);
         float horizontalSpeed = horizontalVelocity.magnitude;
-        speedText.text = horizontalSpeed.ToString("F1") + " m/s";
+        speedText.text = horizontalSpeed.ToString("F1");
+        drivetrainText.text = drivetrainMode.ToString();
     }
 }
