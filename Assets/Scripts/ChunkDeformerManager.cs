@@ -3,24 +3,42 @@ using UnityEngine;
 public class ChunkDeformerManager : MonoBehaviour
 {
     private MeshDeformer deformer;
+    private ChunkedTerrainGenerator generator;
     private Bounds bounds;
+    
+    private float deformRadius;
 
     private void Start()
     {
+        generator = GetComponentInParent<ChunkedTerrainGenerator>();
         deformer = GetComponent<MeshDeformer>();
         var meshFilter = GetComponent<MeshFilter>();
 
         bounds = meshFilter.mesh.bounds;
         bounds = TransformBounds(bounds, transform.localToWorldMatrix);
+        
+        deformRadius = generator.deformRadius;
     }
 
     public void DeformAtWorldPoint(Vector3 worldPos)
     {
-        if (bounds.Contains(worldPos))
+        if (IntersectsCircle(bounds, worldPos, deformRadius))
         {
-            // Debug.Log($"{name} deforming at {worldPos}");
             deformer.DeformAtPoint(worldPos);
         }
+    }
+
+    /// Проверка: пересекается ли окружность с Bounds
+    private bool IntersectsCircle(Bounds b, Vector3 center, float radius)
+    {
+        // Ограничиваемся проверкой по X и Z, игнорируем высоту
+        Vector2 closestPoint = new Vector2(
+            Mathf.Clamp(center.x, b.min.x, b.max.x),
+            Mathf.Clamp(center.z, b.min.z, b.max.z)
+        );
+
+        float dist = Vector2.Distance(closestPoint, new Vector2(center.x, center.z));
+        return dist < radius;
     }
 
     private Bounds TransformBounds(Bounds localBounds, Matrix4x4 localToWorld)

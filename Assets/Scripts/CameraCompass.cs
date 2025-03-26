@@ -11,6 +11,11 @@ public class CameraCompass : MonoBehaviour
 
     void Update()
     {
+        if (!player || !npc)
+        {
+            return;
+        }
+        
         // Получаем направление между игроком и NPC
         Vector3 direction = npc.position - player.position;
         direction.Normalize();
