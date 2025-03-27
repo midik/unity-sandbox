@@ -19,7 +19,7 @@ MonoBehaviour:
     width: 2560
     height: 1329
   m_ShowMode: 4
-  m_Title: Console
+  m_Title: Inspector
   m_RootView: {fileID: 6}
   m_MinSize: {x: 875, y: 300}
   m_MaxSize: {x: 10000, y: 10000}
@@ -386,9 +386,9 @@ MonoBehaviour:
     m_TextWithWhitespace: "Lighting\u200B"
   m_Pos:
     serializedVersion: 2
-    x: 3904
+    x: 3905
     y: 91
-    width: 575
+    width: 574
     height: 1247
   m_SerializedDataModeController:
     m_DataMode: 0
@@ -464,10 +464,10 @@ MonoBehaviour:
   m_LockTracker:
     m_IsLocked: 0
   m_FolderTreeState:
-    scrollPos: {x: 0, y: 15}
-    m_SelectedIDs: a6ec0000
-    m_LastClickedID: 60582
-    m_ExpandedIDs: 
+    scrollPos: {x: 0, y: 0}
+    m_SelectedIDs: b0690100
+    m_LastClickedID: 92592
+    m_ExpandedIDs: 00000000a4be0000
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -496,7 +496,7 @@ MonoBehaviour:
     scrollPos: {x: 0, y: 0}
     m_SelectedIDs: 
     m_LastClickedID: 0
-    m_ExpandedIDs: 
+    m_ExpandedIDs: 00000000a4be0000
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -522,9 +522,9 @@ MonoBehaviour:
       m_Icon: {fileID: 0}
       m_ResourceFile: 
   m_ListAreaState:
-    m_SelectedInstanceIDs: 
-    m_LastClickedInstanceID: 0
-    m_HadKeyboardFocusLastEvent: 1
+    m_SelectedInstanceIDs: d2f50000
+    m_LastClickedInstanceID: 62930
+    m_HadKeyboardFocusLastEvent: 0
     m_ExpandedInstanceIDs: c62300005aa6000000000000
     m_RenameOverlay:
       m_UserAcceptedRename: 0
@@ -595,7 +595,7 @@ MonoBehaviour:
       scrollPos: {x: 0, y: 0}
       m_SelectedIDs: 
       m_LastClickedID: 0
-      m_ExpandedIDs: 74f9ffff
+      m_ExpandedIDs: c497f0ffdc97f0ffae9af0ff5a42fffff448ffffd2f50000
       m_RenameOverlay:
         m_UserAcceptedRename: 0
         m_Name: 
@@ -612,7 +612,7 @@ MonoBehaviour:
         m_OriginalEventType: 11
         m_IsRenamingFilename: 0
         m_TrimLeadingAndTrailingWhitespace: 0
-        m_ClientGUIView: {fileID: 0}
+        m_ClientGUIView: {fileID: 4}
       m_SearchString: 
     m_ExpandedScenes: []
     m_CurrenRootInstanceID: 0
@@ -1129,9 +1129,9 @@ MonoBehaviour:
   m_AudioPlay: 0
   m_DebugDrawModesUseInteractiveLightBakingData: 0
   m_Position:
-    m_Target: {x: 93.801056, y: 8.61646, z: 104.07108}
+    m_Target: {x: 29.231602, y: 2.1800003, z: 98.36541}
     speed: 2
-    m_Value: {x: 93.801056, y: 8.61646, z: 104.07108}
+    m_Value: {x: 29.231602, y: 2.1800003, z: 98.36541}
   m_RenderMode: 0
   m_CameraMode:
     drawMode: 0
@@ -1177,13 +1177,13 @@ MonoBehaviour:
     m_GridAxis: 1
     m_gridOpacity: 0.5
   m_Rotation:
-    m_Target: {x: 0.22780897, y: 0.5934682, z: -0.17997308, w: 0.75068206}
+    m_Target: {x: 0.19492732, y: 0.57193834, z: -0.14207195, w: 0.78403157}
     speed: 2
-    m_Value: {x: 0.22780898, y: 0.59346825, z: -0.1799731, w: 0.7506821}
+    m_Value: {x: 0.1949273, y: 0.57193834, z: -0.14207195, w: 0.78403157}
   m_Size:
-    m_Target: 85.54581
+    m_Target: 8.951192
     speed: 2
-    m_Value: 85.54581
+    m_Value: 8.951192
   m_Ortho:
     m_Target: 0
     speed: 2
@@ -1288,7 +1288,7 @@ MonoBehaviour:
     m_HSlider: 0
     m_VSlider: 0
     m_IgnoreScrollWheelUntilClicked: 0
-    m_EnableMouseInput: 1
+    m_EnableMouseInput: 0
     m_EnableSliderZoomHorizontal: 0
     m_EnableSliderZoomVertical: 0
     m_UniformScale: 1
