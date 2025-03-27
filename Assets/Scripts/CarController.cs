@@ -17,13 +17,7 @@ public class CarController : Driveable
     {
         base.Start();
         
-        InitializeWheels();
-        rb = GetComponent<Rigidbody>();
-
-        spawnPosition = transform.position;
-        spawnRotation = transform.rotation.eulerAngles;
         respawnText.gameObject.SetActive(false);
-
         aliveDetector = GetComponent<AliveDetector>();
     }
 

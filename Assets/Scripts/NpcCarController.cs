@@ -7,17 +7,17 @@ public class NpcCarController : Driveable
     public AliveDetector aliveDetector;
     public Logger logger;
 
+    public float stopDistance = 15f;
+    public float edgeDetectionDistance = 3f;
+    public float rayOffsetY = 0.5f;
+    public float sideOffset = 0.6f;
+
     private bool isRespawnPending;
 
     protected override void Start()
     {
         base.Start();
-        // InitializeWheels();
-        // InitializeRigidBody();
-        // InitializeSpawnData();
-
         isRespawnPending = false;
-
         aliveDetector = GetComponent<AliveDetector>();
     }
 
@@ -29,6 +29,13 @@ public class NpcCarController : Driveable
             Drive(0f, 0f);
             StartCoroutine(RespawnAfterDelay(3f));
             isRespawnPending = true;
+            return;
+        }
+
+        if (EdgeAhead())
+        {
+            logger.Log("Edge ahead! Stopping");
+            Drive(0f, 0f);
             return;
         }
 
@@ -44,6 +51,35 @@ public class NpcCarController : Driveable
         Drive(steer, motor);
     }
 
+    private bool EdgeAhead()
+    {
+        Vector3 velocity = rb.linearVelocity;
+        if (velocity.magnitude < 0.1f) return false; // Стоим на месте — не проверяем
+
+        Vector3 direction = velocity.normalized;
+        Vector3 origin = transform.position + Vector3.up * rayOffsetY;
+        Vector3[] rayOrigins =
+        {
+            origin,
+            origin + transform.right * sideOffset,
+            origin - transform.right * sideOffset
+        };
+
+        LayerMask terrainMask = LayerMask.GetMask("TerrainChunk");
+
+        foreach (var rayOrigin in rayOrigins)
+        {
+            bool hit = Physics.Raycast(rayOrigin, direction, out RaycastHit info, edgeDetectionDistance, terrainMask);
+
+            Debug.DrawRay(rayOrigin, direction * edgeDetectionDistance, hit ? Color.green : Color.red, 0.1f);
+
+            if (hit)
+                return false; // Земля есть впереди — всё норм
+        }
+
+        return true; // Ни один луч не нашёл землю
+    }
+
     private IEnumerator RespawnAfterDelay(float delay)
     {
         logger.Log("NPC respawn pending");
@@ -57,6 +93,4 @@ public class NpcCarController : Driveable
         isRespawnPending = false;
         logger.Log("NPC respawn completed");
     }
-
-    public float stopDistance = 15f;
 }
