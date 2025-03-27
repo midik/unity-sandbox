@@ -1,55 +1,43 @@
 using TMPro;
 using UnityEngine;
 
-public class CarController : Respawnable
+public class CarController : Driveable
 {
-    public float motorTorque = 1500f;
-    public float steerAngle = 30f;
-    
     public TextMeshProUGUI speedText;
     public TextMeshProUGUI respawnText;
     public TextMeshProUGUI drivetrainText;
-    
+
     public SmartFollowCamera followCamera;
     public AliveDetector aliveDetector;
 
-    private WheelCollider FL, FR, RL, RR;
-    
     private InputSystem_Actions inputActions;
     private Vector2 moveInput;
-    
-    private enum DrivetrainMode { AWD, FWD, RWD }
-    private DrivetrainMode drivetrainMode;
 
-    private void Start()
+    protected override void Start()
     {
-        FL = transform.Find("Wheel FL").GetComponent<WheelCollider>();
-        FR = transform.Find("Wheel FR").GetComponent<WheelCollider>();
-        RL = transform.Find("Wheel RL").GetComponent<WheelCollider>();
-        RR = transform.Find("Wheel RR").GetComponent<WheelCollider>();
+        base.Start();
         
+        InitializeWheels();
         rb = GetComponent<Rigidbody>();
-        
+
         spawnPosition = transform.position;
         spawnRotation = transform.rotation.eulerAngles;
         respawnText.gameObject.SetActive(false);
-        
+
         aliveDetector = GetComponent<AliveDetector>();
     }
-    
-    void Awake()
+
+    protected override void Awake()
     {
+        base.Awake();
+        
         inputActions = new InputSystem_Actions();
         inputActions.Player.Move.performed += ctx => moveInput = ctx.ReadValue<Vector2>();
         inputActions.Player.Move.canceled += ctx => moveInput = Vector2.zero;
         inputActions.Player.Respawn.performed += ctx => Respawn();
-        inputActions.Player.ToggleDrivetrainMode.performed += ctx =>
-        {
-            drivetrainMode++;
-            if (drivetrainMode > DrivetrainMode.RWD) drivetrainMode = 0;
-        };
+        inputActions.Player.ToggleDrivetrainMode.performed += ctx => ToggleDrivetrain();
     }
-    
+
     void OnEnable() => inputActions.Enable();
     void OnDisable() => inputActions.Disable();
 
@@ -62,29 +50,12 @@ public class CarController : Respawnable
             Drive(0f, 0f);
             return;
         }
-        
+
         float motor = motorTorque * moveInput.y;
         float steering = steerAngle * moveInput.x;
         Drive(steering, motor);
-        
-        UpdateHud();
-    }
 
-    private void Drive(float steering, float motor)
-    {
-        FL.steerAngle = steering;
-        FR.steerAngle = steering;
-        
-        if (drivetrainMode == DrivetrainMode.FWD || drivetrainMode == DrivetrainMode.AWD)
-        {
-            FL.motorTorque = motor;
-            FR.motorTorque = motor;
-        }
-        if (drivetrainMode == DrivetrainMode.RWD || drivetrainMode == DrivetrainMode.AWD)
-        {
-            RL.motorTorque = motor;
-            RR.motorTorque = motor;
-        }
+        UpdateHud();
     }
 
     protected override void OnRespawned()
@@ -93,7 +64,7 @@ public class CarController : Respawnable
         followCamera.ResetToTarget();
         respawnText.gameObject.SetActive(false);
     }
-    
+
     void UpdateHud()
     {
         if (aliveDetector.isDead) return;

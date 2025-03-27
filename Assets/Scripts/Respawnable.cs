@@ -13,6 +13,11 @@ public abstract class Respawnable : MonoBehaviour
         spawnPosition = transform.position;
         spawnRotation = transform.rotation.eulerAngles;
     }
+    
+    protected virtual void Awake()
+    {
+        InitializeRigidBody();
+    }
 
     public void Respawn()
     {
@@ -33,6 +38,11 @@ public abstract class Respawnable : MonoBehaviour
         rb.isKinematic = false;
 
         OnRespawned(); // 🔔 событие для дочернего класса
+    }
+    
+    protected void InitializeRigidBody()
+    {
+        rb = GetComponent<Rigidbody>();
     }
 
     protected abstract void OnRespawned();

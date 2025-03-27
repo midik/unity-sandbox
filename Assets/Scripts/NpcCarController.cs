@@ -1,30 +1,24 @@
 using System.Collections;
 using UnityEngine;
 
-public class NpcCarController : Respawnable
+public class NpcCarController : Driveable
 {
-    public Transform target;
-    
-    public float motorTorque = 1000f;
-    public float steerAngle = 30f;
-    public float maxSpeed = 20f;
-    public float stopDistance = 15f;
-
+    public Transform target; // Цель (игрок)
     public AliveDetector aliveDetector;
     public Logger logger;
 
-    private WheelCollider FL, FR, RL, RR;
-
-    private bool isRespawnPending = false;
+    private bool isRespawnPending;
 
     protected override void Start()
     {
         base.Start();
+        // InitializeWheels();
+        // InitializeRigidBody();
+        // InitializeSpawnData();
 
-        FL = transform.Find("Wheel FL").GetComponent<WheelCollider>();
-        FR = transform.Find("Wheel FR").GetComponent<WheelCollider>();
-        RL = transform.Find("Wheel RL").GetComponent<WheelCollider>();
-        RR = transform.Find("Wheel RR").GetComponent<WheelCollider>();
+        isRespawnPending = false;
+
+        aliveDetector = GetComponent<AliveDetector>();
     }
 
     void FixedUpdate()
@@ -32,7 +26,6 @@ public class NpcCarController : Respawnable
         if (aliveDetector.isDead && !isRespawnPending)
         {
             logger.Log("NPC car stuck");
-
             Drive(0f, 0f);
             StartCoroutine(RespawnAfterDelay(3f));
             isRespawnPending = true;
@@ -51,28 +44,19 @@ public class NpcCarController : Respawnable
         Drive(steer, motor);
     }
 
-    private void Drive(float steering, float motor)
-    {
-        FL.steerAngle = steering;
-        FR.steerAngle = steering;
-
-        FL.motorTorque = motor;
-        FR.motorTorque = motor;
-        RL.motorTorque = motor;
-        RR.motorTorque = motor;
-    }
-
     private IEnumerator RespawnAfterDelay(float delay)
     {
         logger.Log("NPC respawn pending");
         yield return new WaitForSeconds(delay);
-        Respawn(); // 🔁 базовый класс Respawnable
+        Respawn();
     }
 
     protected override void OnRespawned()
     {
-        logger.Log("NPC respawn completed");
         aliveDetector.Recover();
         isRespawnPending = false;
+        logger.Log("NPC respawn completed");
     }
+
+    public float stopDistance = 15f;
 }
