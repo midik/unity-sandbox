@@ -1,43 +1,30 @@
 using System.Collections;
 using UnityEngine;
 
-public class NpcCarController : MonoBehaviour
+public class NpcCarController : Respawnable
 {
-    public Transform target; // Цель (игрок)
-    public Transform frame;
+    public Transform target;
     
     public float motorTorque = 1000f;
     public float steerAngle = 30f;
     public float maxSpeed = 20f;
-    public float stopDistance = 15f; // расстояние, когда NPC "доволен"
+    public float stopDistance = 15f;
 
     public AliveDetector aliveDetector;
     public Logger logger;
 
-    private WheelCollider FL;
-    private WheelCollider FR;
-    private WheelCollider RL;
-    private WheelCollider RR;
-    
-    private Rigidbody rb;
+    private WheelCollider FL, FR, RL, RR;
 
-    private Vector3 spawnPosition;
-    private Vector3 spawnRotation;
-    
     private bool isRespawnPending = false;
-    
 
-    void Start()
+    protected override void Start()
     {
+        base.Start();
+
         FL = transform.Find("Wheel FL").GetComponent<WheelCollider>();
         FR = transform.Find("Wheel FR").GetComponent<WheelCollider>();
         RL = transform.Find("Wheel RL").GetComponent<WheelCollider>();
         RR = transform.Find("Wheel RR").GetComponent<WheelCollider>();
-        
-        rb = GetComponent<Rigidbody>();
-        
-        spawnPosition = frame.position;
-        spawnRotation = frame.rotation.eulerAngles;
     }
 
     void FixedUpdate()
@@ -45,32 +32,22 @@ public class NpcCarController : MonoBehaviour
         if (aliveDetector.isDead && !isRespawnPending)
         {
             logger.Log("NPC car stuck");
-            
+
             Drive(0f, 0f);
             StartCoroutine(RespawnAfterDelay(3f));
             isRespawnPending = true;
-            
             return;
         }
 
-        // Вектор к цели
-        Vector3 toTarget = target.position - frame.position;
+        Vector3 toTarget = target.position - transform.position;
         toTarget.y = 0f;
-        
-        // Debug.DrawRay(frame.position, toTarget.normalized * 10, Color.green); // цель
-        // Debug.DrawRay(frame.position, frame.forward * 10, Color.red); // морда
 
-        // Угол между forward и направлением на цель
-        float angle = Vector3.SignedAngle(frame.forward, toTarget, Vector3.up);
-
-        // Поворот колес (-1 до 1)
+        float angle = Vector3.SignedAngle(transform.forward, toTarget, Vector3.up);
         float steer = Mathf.Clamp(angle / 45f, -1f, 1f) * steerAngle;
 
-        // Если далеко — газуем, иначе останавливаемся
         float distance = toTarget.magnitude;
         float motor = distance > stopDistance ? motorTorque : 0f;
 
-        // --- Управляем колесами ---
         Drive(steer, motor);
     }
 
@@ -84,27 +61,18 @@ public class NpcCarController : MonoBehaviour
         RL.motorTorque = motor;
         RR.motorTorque = motor;
     }
-    
+
     private IEnumerator RespawnAfterDelay(float delay)
     {
         logger.Log("NPC respawn pending");
         yield return new WaitForSeconds(delay);
-        Respawn();
+        Respawn(); // 🔁 базовый класс Respawnable
     }
 
-    public void Respawn()
+    protected override void OnRespawned()
     {
-        logger.Log("NPC respawn started");
-        
-        rb.linearVelocity = Vector3.zero;
-        rb.angularVelocity = Vector3.zero;
-        Drive(0f, 0f);
-        
-        frame.position = spawnPosition + Vector3.up * 0.5f;
-        frame.rotation = Quaternion.Euler(spawnRotation);
-
+        logger.Log("NPC respawn completed");
         aliveDetector.Recover();
         isRespawnPending = false;
-        logger.Log("NPC respawn completed");
     }
 }

@@ -1,9 +1,8 @@
 using TMPro;
 using UnityEngine;
 
-public class CarController : MonoBehaviour
+public class CarController : Respawnable
 {
-    // public WheelCollider[] wheels; // Передать 4 коллайдера
     public float motorTorque = 1500f;
     public float steerAngle = 30f;
     
@@ -13,16 +12,8 @@ public class CarController : MonoBehaviour
     
     public SmartFollowCamera followCamera;
     public AliveDetector aliveDetector;
-    
-    private WheelCollider FL;
-    private WheelCollider FR;
-    private WheelCollider RL;
-    private WheelCollider RR;
-    
-    private Rigidbody rb;
-    
-    private Vector3 spawnPosition;
-    private Vector3 spawnRotation;
+
+    private WheelCollider FL, FR, RL, RR;
     
     private InputSystem_Actions inputActions;
     private Vector2 moveInput;
@@ -96,18 +87,10 @@ public class CarController : MonoBehaviour
         }
     }
 
-    void Respawn()
+    protected override void OnRespawned()
     {
-        rb.linearVelocity = Vector3.zero;
-        rb.angularVelocity = Vector3.zero;
-        
-        transform.position = spawnPosition + Vector3.up * 0.5f;
-        transform.rotation = Quaternion.Euler(spawnRotation);
-
         aliveDetector.Recover();
-
         followCamera.ResetToTarget();
-
         respawnText.gameObject.SetActive(false);
     }
     
