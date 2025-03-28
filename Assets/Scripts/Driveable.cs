@@ -4,6 +4,8 @@ public abstract class Driveable : Respawnable
 {
     public float motorTorque = 1500f;
     public float steerAngle = 30f;
+    public float maxSpeed = 60f;
+    public float maxRPM = 3000f;    // влияет на звук
     
     public float throttleNormalized { get; private set; }
 

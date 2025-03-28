@@ -5,16 +5,25 @@ public class CarAudioController : MonoBehaviour
 {
     [Header("Audio Sources")]
     public AudioSource engineAudioSource;
+    public AudioSource rollingAudioSource; // <-- Добавили
 
     [Header("Engine Sound Settings")]
     public float minPitch = 1f; // Минимальный Pitch на холостых
     public float maxPitch = 5f; // Максимальный Pitch на высоких оборотах
     public float pitchChangeSpeed = 10.0f; // Плавность изменения Pitch
-
+    
     // Опционально: модуляция громкости
-    public float minVolume = 0.2f;
+    public float minVolume = 0.8f;
     public float maxVolume = 1f;
     public float volumeChangeSpeed = 8.0f;
+    
+    [Header("Rolling Sound Settings")]
+    [Tooltip("Мин. громкость звука качения")]
+    public float rollingMinVolume = 0.1f;
+    [Tooltip("Громкость звука качения при максимальной скорости")]
+    public float rollingMaxVolume = 0.5f;
+    [Tooltip("Скорость (км/ч) для макс. громкости качения")]
+    // public float rollingMaxSpeed = 80f; 
 
     // Компоненты машины
     private Driveable driveable;
@@ -51,19 +60,25 @@ public class CarAudioController : MonoBehaviour
 
     void Update()
     {
+        EngineSound();
+        RollingSound();
+    }
+
+    void EngineSound()
+    {
         if (!engineAudioSource) return;
 
         // --- Расчет целевого Pitch ---
         float averageRPM = 0f;
         foreach (var wheel in wheels)
         {
-            averageRPM += Mathf.Max(0f, wheel.rpm); // Берем положительные обороты
+            averageRPM += Mathf.Abs(wheel.rpm);
         }
 
         averageRPM /= 4;
 
-        // Нормализуем RPM (нужно подобрать макс. значение, например 3000)
-        float targetPitchFactor = Mathf.InverseLerp(0f, 3000f, averageRPM);
+        // Нормализуем RPM
+        float targetPitchFactor = Mathf.InverseLerp(0f, driveable.maxRPM, averageRPM);
 
         // Целевой Pitch зависит от оборотов/скорости и немного от газа
         float targetPitch = Mathf.Lerp(minPitch, maxPitch, targetPitchFactor);
@@ -74,7 +89,7 @@ public class CarAudioController : MonoBehaviour
         // Громкость зависит от газа и немного от оборотов/скорости
         float targetVolume =
             Mathf.Lerp(minVolume, maxVolume, driveable.throttleNormalized); // Основная зависимость от газа
-        targetVolume += targetPitchFactor * 0.1f; // Чуть громче на высоких оборотах
+        // targetVolume += targetPitchFactor * 0.1f; // Чуть громче на высоких оборотах
         targetVolume = Mathf.Clamp(targetVolume, minVolume, maxVolume);
 
         // --- Плавное изменение Pitch и Volume ---
@@ -83,5 +98,36 @@ public class CarAudioController : MonoBehaviour
 
         engineAudioSource.pitch = currentPitch;
         engineAudioSource.volume = currentVolume;
+    }
+
+    // --- Звук Качения Колес ---
+    void RollingSound()
+    {
+        if (!rollingAudioSource) return;
+        
+        float speed = rb.linearVelocity.magnitude * 3.6f;
+        // Громкость зависит от скорости и от того, касается ли хоть одно колесо земли
+        bool anyWheelGrounded = false;
+        foreach (var wheel in wheels)
+        {
+            if (wheel.isGrounded)
+            {
+                anyWheelGrounded = true;
+                break;
+            }
+        }
+
+        // Целевая громкость: 0, если не на земле, иначе зависит от скорости
+        float targetRollingVolume = 0f;
+        if (anyWheelGrounded)
+        {
+            targetRollingVolume = Mathf.Lerp(rollingMinVolume, rollingMaxVolume, Mathf.InverseLerp(0f, driveable.maxSpeed, speed));
+        }
+
+        // Плавно меняем громкость (можно использовать одну общую скорость volumeChangeSpeed)
+        rollingAudioSource.volume = Mathf.Lerp(rollingAudioSource.volume, targetRollingVolume, Time.deltaTime * volumeChangeSpeed);
+
+        // Можно также немного менять Pitch качения от скорости
+        rollingAudioSource.pitch = Mathf.Lerp(0.8f, 1.2f, Mathf.InverseLerp(0f, driveable.maxSpeed, speed));
     }
 }
