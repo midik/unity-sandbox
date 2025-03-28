@@ -59,17 +59,17 @@ There used to be several dozen thin rectangles on the scene that could be pushed
 - :white_check_mark: UI + PiP camera
 - :white_check_mark: improve terrain generator
 - :white_check_mark: spline valleys
+- :white_check_mark: sounds
+- :white_check_mark: day/night cycle
 - :black_square_button: add landscape objects
 - :black_square_button: add spline-based roads and rivers
 - :black_square_button: dynamic chunk loading
 - :black_square_button: bigger landscape
 - :black_square_button: biomes
-- :black_square_button: sounds
 - :black_square_button: make NPC smarter
 - :black_square_button: add basic gameplay
 - :black_square_button: main menu
 - :black_square_button: improve car headlights
-- :black_square_button: day/night cycle
 - :black_square_button: basic weather
 - :black_square_button: first person camera
 - :black_square_button: ...
