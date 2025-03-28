@@ -1,6 +1,6 @@
 using UnityEngine;
 using System;
-using System.Collections; // Добавлено для корутины IEnumerator
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using Unity.Mathematics;
@@ -46,13 +46,26 @@ public class ChunkedTerrainGenerator : MonoBehaviour
     public SplineContainer splineContainer; // Сюда перетащить объект со сплайнами из сцены
     public float splineValleyWidth = 5f; // Ширина плоского дна долины
     public float splineValleyDepth = 6f; // Глубина долины в центре относительно окружающего рельефа
-
     public float splineValleyFalloff = 10f; // Расстояние, на котором долина переходит в обычный рельеф (ширина склона)
 
     // По умолчанию EaseInOut: начинается и заканчивается плавно, похоже на smoothstep
     // Ключи: (время=0, значение=1), (время=1, значение=0)
     public AnimationCurve valleySlopeCurve = AnimationCurve.EaseInOut(0f, 1f, 1f, 0f);
 
+    [Header("Road Generation")] public bool generateRoad = true;
+    [Tooltip("Объект, в который будут помещены все сегменты дороги")]
+    public GameObject roads;
+    [Tooltip("Использовать те же сплайны, что и для долин")]
+    public bool useValleySplinesForRoads = true; // Если нужно отдельные сплайны - добавить еще SplineContainer
+
+    public float roadWidth = 4f; // Ширина дороги
+    public Material roadMaterial; // Материал дороги
+
+    [Tooltip("Шаг в единицах длины сплайна для создания вершин дороги")]
+    public float roadMeshStep = 1.0f; // Например, 1 метр
+
+    [Tooltip("Насколько приподнять меш дороги над террейном")]
+    public float roadRaise = 0.05f;
 
     [Header("Deformation")] public float deformRadius = 0.35f;
     public float deformStrength = 0.1f;
@@ -72,7 +85,7 @@ public class ChunkedTerrainGenerator : MonoBehaviour
     }
 
     // Метод для вызова из Context Menu в редакторе
-    [ContextMenu("Generate (Editor Sync with Progress)")]
+    [ContextMenu("Terrain - Generate")]
     void GenerateContextMenu()
     {
 #if UNITY_EDITOR
@@ -96,7 +109,7 @@ public class ChunkedTerrainGenerator : MonoBehaviour
     }
 
     // Метод для очистки чанков (вызывается из Context Menu)
-    [ContextMenu("Clear Chunks")]
+    [ContextMenu("Terrain - Clear")]
     void ClearChunksContextMenu()
     {
         ClearChunks();
@@ -242,7 +255,6 @@ public class ChunkedTerrainGenerator : MonoBehaviour
         OnChunksRegenerated?.Invoke();
         // Debug.Log($"Terrain generation COROUTINE finished in {(Time.realtimeSinceStartup - startTime):F2} seconds.");
     }
-
 
     void CacheSplines()
     {
@@ -480,7 +492,6 @@ public class ChunkedTerrainGenerator : MonoBehaviour
         return heightAfterNoiseValleys;
     }
 
-
     // Метод очистки чанков
     void ClearChunks()
     {
@@ -509,5 +520,177 @@ public class ChunkedTerrainGenerator : MonoBehaviour
             // Destroy сам по себе отложенный, но для синхронности можно подождать конца кадра,
             // но это усложнит логику, пока оставим так.
         }
+    }
+
+    [ContextMenu("Roads - Generate")]
+    void GenerateRoads()
+    {
+        if (!generateRoad) return;
+        if (!roads)
+        {
+            Debug.LogWarning("Cannot generate roads: Road container is not assigned.");
+            return;
+        }
+
+        if (!roadMaterial)
+        {
+            Debug.LogWarning("Cannot generate roads: Road Material is not assigned.");
+            return;
+        }
+
+        if (cachedSplines == null || cachedSplines.Count == 0)
+        {
+            CacheSplines();
+        }
+
+        if (!useValleySplinesForRoads || cachedSplines == null || cachedSplines.Count == 0)
+        {
+            Debug.LogWarning("Cannot generate roads: Road generation enabled, but no valid splines found or assigned.");
+            return;
+        }
+
+        float startTime = Time.realtimeSinceStartup;
+        Debug.Log("Starting road generation...");
+
+        ClearRoads();
+
+        LayerMask terrainMask = LayerMask.GetMask("TerrainChunk");
+        Vector3 raiseVector = Vector3.up * roadRaise; // Используем мировой Vector3.up
+
+        int roadSegmentIndex = 0;
+        foreach (var spline in cachedSplines)
+        {
+            if (spline == null || spline.Knots == null || spline.Knots.Count() < 2) continue;
+
+            List<Vector3> vertices = new List<Vector3>();
+            List<Vector2> uvs = new List<Vector2>();
+            List<int> triangles = new List<int>();
+            float currentDistance = 0f; // Пройденное расстояние для V-координаты
+
+            float splineLength = spline.GetLength(); // Получаем длину сплайна
+            if (splineLength < roadMeshStep) continue; // Сплайн слишком короткий
+
+            // Итерация по длине сплайна с заданным шагом
+            for (float dist = 0; dist <= splineLength; dist += roadMeshStep)
+            {
+                // Получаем параметр t (0..1) по расстоянию
+                float t = dist / splineLength;
+                // Получаем точку, тангенс и нормаль на сплайне
+                spline.Evaluate(t, out float3 pos, out float3 dir, out float3 up);
+
+                if (math.lengthsq(dir) < 0.001f) continue; // Пропускаем, если тангенс нулевой
+                dir = math.normalize(dir);
+                up = math.normalize(up);
+
+                float3 right = math.normalize(math.cross(dir, up));
+
+                // Идеальные точки краев дороги
+                float3 p_left_ideal = pos - right * (roadWidth / 2f);
+                float3 p_right_ideal = pos + right * (roadWidth / 2f);
+
+                // Проецируем на террейн
+                Vector3 p_left_real = p_left_ideal; // Значение по умолчанию, если Raycast не сработает
+                Vector3 p_right_real = p_right_ideal;
+                float raycastDist = 50f; // Достаточно длинный луч вниз
+
+                RaycastHit hitLeft;
+                if (Physics.Raycast(p_left_ideal + (float3)Vector3.up * (raycastDist / 2f), Vector3.down, out hitLeft,
+                        raycastDist, terrainMask))
+                {
+                    p_left_real = hitLeft.point;
+                }
+                else
+                {
+                    Debug.DrawRay(p_left_ideal + (float3)Vector3.up * (raycastDist / 2f), Vector3.down * raycastDist,
+                        Color.red, 5f);
+                } // Луч, если не попал
+
+                RaycastHit hitRight;
+                if (Physics.Raycast(p_right_ideal + (float3)Vector3.up * (raycastDist / 2f), Vector3.down, out hitRight,
+                        raycastDist, terrainMask))
+                {
+                    p_right_real = hitRight.point;
+                }
+                else
+                {
+                    Debug.DrawRay(p_right_ideal + (float3)Vector3.up * (raycastDist / 2f), Vector3.down * raycastDist,
+                        Color.red, 5f);
+                } // Луч, если не попал
+
+
+                // Добавляем вершины (приподнятые)
+                int vertIndex = vertices.Count;
+                vertices.Add(p_left_real + raiseVector);
+                vertices.Add(p_right_real + raiseVector);
+
+                // Добавляем UV (V зависит от пройденного расстояния)
+                // Можно добавить множитель для тайлинга текстуры
+                float vCoord = currentDistance / (roadWidth); // Пример: тайлинг зависит от ширины
+                uvs.Add(new Vector2(0, vCoord));
+                uvs.Add(new Vector2(1, vCoord));
+
+                // Добавляем треугольники (если это не первая пара вершин)
+                if (vertIndex > 0)
+                {
+                    // Треугольник 1: (N-2) -> (N-1) -> N
+                    triangles.Add(vertIndex - 2);
+                    triangles.Add(vertIndex - 1);
+                    triangles.Add(vertIndex + 0);
+
+                    // Треугольник 2: N -> (N-1) -> (N+1)
+                    triangles.Add(vertIndex + 0);
+                    triangles.Add(vertIndex - 1);
+                    triangles.Add(vertIndex + 1);
+                }
+
+                currentDistance += roadMeshStep; // Увеличиваем пройденное расстояние
+            }
+
+            // Создаем объект и меш для этого сегмента дороги
+            if (vertices.Count >= 4)
+            {
+                GameObject roadSegment = new GameObject($"Road_Spline_{roadSegmentIndex}");
+                roadSegment.transform.parent = roads.transform;
+
+                Mesh roadMesh = new Mesh { name = $"RoadMesh_{roadSegmentIndex}" };
+                roadMesh.vertices = vertices.ToArray();
+                roadMesh.uv = uvs.ToArray();
+                roadMesh.triangles = triangles.ToArray();
+                roadMesh.RecalculateNormals();
+                roadMesh.RecalculateBounds();
+
+                MeshFilter roadMF = roadSegment.AddComponent<MeshFilter>();
+                roadMF.mesh = roadMesh;
+
+                MeshRenderer roadMR = roadSegment.AddComponent<MeshRenderer>();
+                roadMR.material = roadMaterial;
+
+                // Опционально: добавить коллайдер
+                MeshCollider roadMC = roadSegment.AddComponent<MeshCollider>();
+                roadMC.sharedMesh = roadMesh;
+            }
+
+            roadSegmentIndex++;
+        }
+
+        Debug.Log($"Road generation finished in {(Time.realtimeSinceStartup - startTime):F2} seconds.");
+    }
+
+    [ContextMenu("Roads - Clear")]
+    void ClearRoads()
+    {
+        if (!roads)
+        {
+            Debug.LogWarning("Cannot clear roads: Road container is not assigned.");
+            return;
+        }
+        
+        for (int i = roads.transform.childCount - 1; i >= 0; i--)
+        {
+            Transform child = roads.transform.GetChild(i);
+            if (child) Destroy(child.gameObject);
+        }
+       
+        Debug.Log("All roads removed.");
     }
 }
