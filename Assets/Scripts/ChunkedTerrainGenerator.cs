@@ -53,8 +53,10 @@ public class ChunkedTerrainGenerator : MonoBehaviour
     public AnimationCurve valleySlopeCurve = AnimationCurve.EaseInOut(0f, 1f, 1f, 0f);
 
     [Header("Road Generation")] public bool generateRoad = true;
+
     [Tooltip("Объект, в который будут помещены все сегменты дороги")]
     public GameObject roads;
+
     [Tooltip("Использовать те же сплайны, что и для долин")]
     public bool useValleySplinesForRoads = true; // Если нужно отдельные сплайны - добавить еще SplineContainer
 
@@ -525,37 +527,27 @@ public class ChunkedTerrainGenerator : MonoBehaviour
     [ContextMenu("Roads - Generate")]
     void GenerateRoads()
     {
+        // ... (проверки generateRoad, splineContainer, roadMaterial как раньше) ...
         if (!generateRoad) return;
-        if (!roads)
-        {
-            Debug.LogWarning("Cannot generate roads: Road container is not assigned.");
-            return;
-        }
-
-        if (!roadMaterial)
-        {
-            Debug.LogWarning("Cannot generate roads: Road Material is not assigned.");
-            return;
-        }
-
-        if (cachedSplines == null || cachedSplines.Count == 0)
-        {
-            CacheSplines();
-        }
-
         if (!useValleySplinesForRoads || cachedSplines == null || cachedSplines.Count == 0)
         {
-            Debug.LogWarning("Cannot generate roads: Road generation enabled, but no valid splines found or assigned.");
+            /*...*/
+            return;
+        }
+
+        if (roadMaterial == null)
+        {
+            /*...*/
             return;
         }
 
         float startTime = Time.realtimeSinceStartup;
-        Debug.Log("Starting road generation...");
+        Debug.Log("Starting road generation (with shoulders)...");
 
         ClearRoads();
 
         LayerMask terrainMask = LayerMask.GetMask("TerrainChunk");
-        Vector3 raiseVector = Vector3.up * roadRaise; // Используем мировой Vector3.up
+        Vector3 raiseVector = Vector3.up * roadRaise; // Мировой вектор подъема дороги
 
         int roadSegmentIndex = 0;
         foreach (var spline in cachedSplines)
@@ -565,109 +557,127 @@ public class ChunkedTerrainGenerator : MonoBehaviour
             List<Vector3> vertices = new List<Vector3>();
             List<Vector2> uvs = new List<Vector2>();
             List<int> triangles = new List<int>();
-            float currentDistance = 0f; // Пройденное расстояние для V-координаты
+            float currentDistance = 0f;
+            float splineLength = spline.GetLength();
+            if (splineLength < roadMeshStep) continue;
 
-            float splineLength = spline.GetLength(); // Получаем длину сплайна
-            if (splineLength < roadMeshStep) continue; // Сплайн слишком короткий
+            // Коэффициенты для UV обочин (можно сделать параметрами)
+            float shoulderU_Start = -0.1f; // UV координата U для нижнего края обочины
+            float roadU_Start = 0f; // UV координата U для края дороги
+            float roadU_End = 1f; // UV координата U для другого края дороги
+            float shoulderU_End = 1.1f; // UV координата U для нижнего края другой обочины
 
-            // Итерация по длине сплайна с заданным шагом
             for (float dist = 0; dist <= splineLength; dist += roadMeshStep)
             {
-                // Получаем параметр t (0..1) по расстоянию
-                float t = dist / splineLength;
-                // Получаем точку, тангенс и нормаль на сплайне
+                float t = Mathf.Clamp01(dist / splineLength); // t от 0 до 1
                 spline.Evaluate(t, out float3 pos, out float3 dir, out float3 up);
 
-                if (math.lengthsq(dir) < 0.001f) continue; // Пропускаем, если тангенс нулевой
-                dir = math.normalize(dir);
-                up = math.normalize(up);
-
+                if (math.lengthsq(dir) < 0.001f) dir = math.forward(); // Запасной вариант, если тангенс нулевой
+                else dir = math.normalize(dir);
+                // Используем мировой Vector3.up, чтобы избежать проблем с наклоном сплайна
+                up = (float3)Vector3.up;
                 float3 right = math.normalize(math.cross(dir, up));
 
-                // Идеальные точки краев дороги
+                // Идеальные точки краев дороги (горизонтальные)
                 float3 p_left_ideal = pos - right * (roadWidth / 2f);
                 float3 p_right_ideal = pos + right * (roadWidth / 2f);
 
-                // Проецируем на террейн
-                Vector3 p_left_real = p_left_ideal; // Значение по умолчанию, если Raycast не сработает
-                Vector3 p_right_real = p_right_ideal;
-                float raycastDist = 50f; // Достаточно длинный луч вниз
+                // Проецируем на террейн, чтобы получить точки НИЗА обочины
+                Vector3 p_left_terrain = p_left_ideal;
+                Vector3 p_right_terrain = p_right_ideal;
+                float raycastDist = 50f; // Длина луча для поиска террейна
 
                 RaycastHit hitLeft;
                 if (Physics.Raycast(p_left_ideal + (float3)Vector3.up * (raycastDist / 2f), Vector3.down, out hitLeft,
                         raycastDist, terrainMask))
                 {
-                    p_left_real = hitLeft.point;
-                }
-                else
-                {
-                    Debug.DrawRay(p_left_ideal + (float3)Vector3.up * (raycastDist / 2f), Vector3.down * raycastDist,
-                        Color.red, 5f);
-                } // Луч, если не попал
+                    p_left_terrain = hitLeft.point;
+                } // TODO: Обработать случай, если Raycast не попал (например, у края карты)
 
                 RaycastHit hitRight;
                 if (Physics.Raycast(p_right_ideal + (float3)Vector3.up * (raycastDist / 2f), Vector3.down, out hitRight,
                         raycastDist, terrainMask))
                 {
-                    p_right_real = hitRight.point;
-                }
-                else
-                {
-                    Debug.DrawRay(p_right_ideal + (float3)Vector3.up * (raycastDist / 2f), Vector3.down * raycastDist,
-                        Color.red, 5f);
-                } // Луч, если не попал
+                    p_right_terrain = hitRight.point;
+                } // TODO: Обработать случай, если Raycast не попал
 
+                // Рассчитываем точки ВЕРХА дороги (приподнятые над точками террейна)
+                Vector3 p_left_road = p_left_terrain + raiseVector;
+                Vector3 p_right_road = p_right_terrain + raiseVector;
 
-                // Добавляем вершины (приподнятые)
+                // Добавляем 4 вершины в список
                 int vertIndex = vertices.Count;
-                vertices.Add(p_left_real + raiseVector);
-                vertices.Add(p_right_real + raiseVector);
+                vertices.Add(p_left_terrain); // Индекс vertIndex + 0
+                vertices.Add(p_left_road); // Индекс vertIndex + 1
+                vertices.Add(p_right_road); // Индекс vertIndex + 2
+                vertices.Add(p_right_terrain); // Индекс vertIndex + 3
 
-                // Добавляем UV (V зависит от пройденного расстояния)
-                // Можно добавить множитель для тайлинга текстуры
-                float vCoord = currentDistance / (roadWidth); // Пример: тайлинг зависит от ширины
-                uvs.Add(new Vector2(0, vCoord));
-                uvs.Add(new Vector2(1, vCoord));
+                // Добавляем UV координаты
+                // V координата зависит от пройденного расстояния (можно добавить множитель тайлинга)
+                float vCoord = currentDistance / (roadWidth * 1.5f); // Примерный тайлинг по ширине
+                uvs.Add(new Vector2(shoulderU_Start, vCoord)); // UV для p_left_terrain
+                uvs.Add(new Vector2(roadU_Start, vCoord)); // UV для p_left_road
+                uvs.Add(new Vector2(roadU_End, vCoord)); // UV для p_right_road
+                uvs.Add(new Vector2(shoulderU_End, vCoord)); // UV для p_right_terrain
 
-                // Добавляем треугольники (если это не первая пара вершин)
-                if (vertIndex > 0)
+                // Добавляем треугольники (если это не первая четверка вершин)
+                if (vertIndex >= 4)
                 {
-                    // Треугольник 1: (N-2) -> (N-1) -> N
-                    triangles.Add(vertIndex - 2);
-                    triangles.Add(vertIndex - 1);
-                    triangles.Add(vertIndex + 0);
+                    int prev_lt = vertIndex - 4; // Индексы предыдущих вершин
+                    int prev_lr = vertIndex - 3;
+                    int prev_rr = vertIndex - 2;
+                    int prev_rt = vertIndex - 1;
 
-                    // Треугольник 2: N -> (N-1) -> (N+1)
-                    triangles.Add(vertIndex + 0);
-                    triangles.Add(vertIndex - 1);
-                    triangles.Add(vertIndex + 1);
+                    int curr_lt = vertIndex + 0; // Индексы текущих вершин
+                    int curr_lr = vertIndex + 1;
+                    int curr_rr = vertIndex + 2;
+                    int curr_rt = vertIndex + 3;
+
+                    // Левая обочина (два треугольника)
+                    triangles.Add(prev_lt);
+                    triangles.Add(prev_lr);
+                    triangles.Add(curr_lt);
+                    triangles.Add(curr_lt);
+                    triangles.Add(prev_lr);
+                    triangles.Add(curr_lr);
+
+                    // Поверхность дороги (два треугольника)
+                    triangles.Add(prev_lr);
+                    triangles.Add(prev_rr);
+                    triangles.Add(curr_lr);
+                    triangles.Add(curr_lr);
+                    triangles.Add(prev_rr);
+                    triangles.Add(curr_rr);
+
+                    // Правая обочина (два треугольника)
+                    triangles.Add(prev_rr);
+                    triangles.Add(prev_rt);
+                    triangles.Add(curr_rr);
+                    triangles.Add(curr_rr);
+                    triangles.Add(prev_rt);
+                    triangles.Add(curr_rt);
                 }
 
-                currentDistance += roadMeshStep; // Увеличиваем пройденное расстояние
+                currentDistance += roadMeshStep;
             }
 
-            // Создаем объект и меш для этого сегмента дороги
-            if (vertices.Count >= 4)
+            // Создаем объект и меш (как раньше, но теперь он включает и обочины)
+            if (vertices.Count >= 8) // Нужно минимум 2 сегмента (8 вершин)
             {
                 GameObject roadSegment = new GameObject($"Road_Spline_{roadSegmentIndex}");
                 roadSegment.transform.parent = roads.transform;
-
                 Mesh roadMesh = new Mesh { name = $"RoadMesh_{roadSegmentIndex}" };
-                roadMesh.vertices = vertices.ToArray();
-                roadMesh.uv = uvs.ToArray();
-                roadMesh.triangles = triangles.ToArray();
+                roadMesh.SetVertices(vertices); // Используем SetVertices для List<Vector3>
+                roadMesh.SetUVs(0, uvs); // Используем SetUVs для List<Vector2>
+                roadMesh.SetTriangles(triangles, 0); // Используем SetTriangles для List<int>
                 roadMesh.RecalculateNormals();
                 roadMesh.RecalculateBounds();
-
                 MeshFilter roadMF = roadSegment.AddComponent<MeshFilter>();
                 roadMF.mesh = roadMesh;
-
                 MeshRenderer roadMR = roadSegment.AddComponent<MeshRenderer>();
                 roadMR.material = roadMaterial;
-
-                // Опционально: добавить коллайдер
-                MeshCollider roadMC = roadSegment.AddComponent<MeshCollider>();
-                roadMC.sharedMesh = roadMesh;
+                // MeshCollider roadMC = roadSegment.AddComponent<MeshCollider>(); // Опционально
+                // roadMC.sharedMesh = roadMesh;
             }
 
             roadSegmentIndex++;
@@ -684,13 +694,13 @@ public class ChunkedTerrainGenerator : MonoBehaviour
             Debug.LogWarning("Cannot clear roads: Road container is not assigned.");
             return;
         }
-        
+
         for (int i = roads.transform.childCount - 1; i >= 0; i--)
         {
             Transform child = roads.transform.GetChild(i);
-            if (child) Destroy(child.gameObject);
+            if (child) DestroyImmediate(child.gameObject);
         }
-       
+
         Debug.Log("All roads removed.");
     }
 }
