@@ -60,8 +60,7 @@ public class NpcCarController : Driveable
     {
         if (isRespawnPending) return;
 
-        if (!aliveDetector) { /* Нет детектора - пропускаем проверку */ }
-        else if (aliveDetector.isDead)
+        if (aliveDetector.isDead)
         {
             logger?.Log($"NPC State: Detected isDead=true. Starting respawn.");
             Drive(0f, 0f, 0f);
@@ -87,45 +86,43 @@ public class NpcCarController : Driveable
             Drive(0f, -motorTorque, -1f);
             return;
         }
-        else
+
+        // --- Основная логика преследования С УЧЕТОМ ОБЪЕЗДА ---
+        if (!target) { Drive(0f, 0f, 0f); return; }
+
+        Vector3 toTarget = target.position - transform.position;
+        toTarget.y = 0f;
+        float distance = toTarget.magnitude;
+
+        if (distance <= stopDistance)
         {
-             // --- Основная логика преследования С УЧЕТОМ ОБЪЕЗДА ---
-             if (!target) { Drive(0f, 0f, 0f); return; }
-
-             Vector3 toTarget = target.position - transform.position;
-             toTarget.y = 0f;
-             float distance = toTarget.magnitude;
-
-             if (distance <= stopDistance)
-             {
-                 logger?.Log("NPC State: Target reached. Stopping.");
-                 Drive(0f, 0f, 0f);
-                 return;
-             }
-
-             // 1. Базовое направление к цели (Seek)
-             float angle = Vector3.SignedAngle(transform.forward, toTarget.normalized, Vector3.up);
-             float seekSteerInput = 0f;
-             if (Mathf.Abs(angle) > 1.0f) { seekSteerInput = Mathf.Clamp(angle / 45f, -1f, 1f); }
-
-             // 2. Расчет избегания препятствий и склонов
-             float avoidanceSteerInput = 0f;
-             if (useObstacleAvoidance)
-             {
-                 avoidanceSteerInput = CalculateObstacleAvoidanceSteer();
-             }
-
-             // 3. Комбинирование рулевых сил
-             float combinedSteerInput = seekSteerInput + avoidanceSteerInput * obstacleAvoidanceWeight;
-             combinedSteerInput = Mathf.Clamp(combinedSteerInput, -1f, 1f);
-
-             // Расчет финального угла и момента
-             float finalSteerAngle = combinedSteerInput * steerAngle;
-             float finalMotorTorque = motorTorque;
-
-             // Применяем управление
-             Drive(finalSteerAngle, finalMotorTorque, 1f);
+            logger?.Log("NPC State: Target reached. Stopping.");
+            Drive(0f, 0f, 0f);
+            return;
         }
+
+        // 1. Базовое направление к цели (Seek)
+        float angle = Vector3.SignedAngle(transform.forward, toTarget.normalized, Vector3.up);
+        float seekSteerInput = 0f;
+        if (Mathf.Abs(angle) > 1.0f) { seekSteerInput = Mathf.Clamp(angle / 45f, -1f, 1f); }
+
+        // 2. Расчет избегания препятствий и склонов
+        float avoidanceSteerInput = 0f;
+        if (useObstacleAvoidance)
+        {
+            avoidanceSteerInput = CalculateObstacleAvoidanceSteer();
+        }
+
+        // 3. Комбинирование рулевых сил
+        float combinedSteerInput = seekSteerInput + avoidanceSteerInput * obstacleAvoidanceWeight;
+        combinedSteerInput = Mathf.Clamp(combinedSteerInput, -1f, 1f);
+
+        // Расчет финального угла и момента
+        float finalSteerAngle = combinedSteerInput * steerAngle;
+        float finalMotorTorque = motorTorque;
+
+        // Применяем управление
+        Drive(finalSteerAngle, finalMotorTorque, 1f);
     }
 
     // Проверка края (лучи вниз)
@@ -273,19 +270,17 @@ public class NpcCarController : Driveable
     {
         if (logger) logger.Log("NPC State: Respawn pending");
         yield return new WaitForSeconds(delay);
-        Respawn(); // Вызываем метод Respawn из базового класса Respawnable
+        Respawn();
     }
 
 
-    // Переопределяем метод OnRespawned из базового класса Respawnable
     protected override void OnRespawned()
     {
-        if (!aliveDetector) { /* No detector */ }
-        else { aliveDetector.Recover(); }
-
+        if (!aliveDetector) return;
+        
+        aliveDetector.Recover();
         isRespawnPending = false;
         currentAvoidanceState = AvoidanceState.None;
         if (logger) logger.Log("NPC State: Respawn completed");
     }
-
-} // Конец класса NpcCarController
+}
