@@ -4,9 +4,11 @@ public abstract class Driveable : Respawnable
 {
     public float motorTorque = 1500f;
     public float steerAngle = 30f;
+    
+    public float throttleNormalized { get; private set; }
 
-    protected WheelCollider FL, FR, RL, RR;
-
+    protected internal WheelCollider FL, FR, RL, RR;
+    
     protected enum DrivetrainMode { AWD, FWD, RWD }
     protected DrivetrainMode drivetrainMode;
 
@@ -16,7 +18,7 @@ public abstract class Driveable : Respawnable
         InitializeSpawnData();
     }
 
-    protected void InitializeWheels()
+    private void InitializeWheels()
     {
         FL = transform.Find("Wheel FL").GetComponent<WheelCollider>();
         FR = transform.Find("Wheel FR").GetComponent<WheelCollider>();
@@ -30,8 +32,10 @@ public abstract class Driveable : Respawnable
         spawnRotation = transform.rotation.eulerAngles;
     }
 
-    protected void Drive(float steering, float motor)
+    protected void Drive(float steering, float motor, float motorNormalized)
     {
+        throttleNormalized = motorNormalized;
+        
         FL.steerAngle = steering;
         FR.steerAngle = steering;
 
@@ -45,11 +49,6 @@ public abstract class Driveable : Respawnable
             RL.motorTorque = motor;
             RR.motorTorque = motor;
         }
-    }
-
-    protected void StopDriving()
-    {
-        Drive(0f, 0f);
     }
 
     protected void ToggleDrivetrain()

@@ -64,7 +64,7 @@ public class NpcCarController : Driveable
         else if (aliveDetector.isDead)
         {
             logger?.Log($"NPC State: Detected isDead=true. Starting respawn.");
-            Drive(0f, 0f);
+            Drive(0f, 0f, 0f);
             StartCoroutine(RespawnAfterDelay(3f));
             isRespawnPending = true;
             currentAvoidanceState = AvoidanceState.None;
@@ -84,13 +84,13 @@ public class NpcCarController : Driveable
             currentAvoidanceState = AvoidanceState.Reversing;
             avoidanceTimer = reverseTime;
             turnDirection = 1f; // Пока просто вправо
-            Drive(0f, -motorTorque);
+            Drive(0f, -motorTorque, -1f);
             return;
         }
         else
         {
              // --- Основная логика преследования С УЧЕТОМ ОБЪЕЗДА ---
-             if (!target) { Drive(0f, 0f); return; }
+             if (!target) { Drive(0f, 0f, 0f); return; }
 
              Vector3 toTarget = target.position - transform.position;
              toTarget.y = 0f;
@@ -99,8 +99,7 @@ public class NpcCarController : Driveable
              if (distance <= stopDistance)
              {
                  logger?.Log("NPC State: Target reached. Stopping.");
-                 Drive(0f, 0f);
-                 // TODO: Убедиться, что Drive(0,0) включает тормоз в Driveable?
+                 Drive(0f, 0f, 0f);
                  return;
              }
 
@@ -125,7 +124,7 @@ public class NpcCarController : Driveable
              float finalMotorTorque = motorTorque;
 
              // Применяем управление
-             Drive(finalSteerAngle, finalMotorTorque);
+             Drive(finalSteerAngle, finalMotorTorque, 1f);
         }
     }
 
@@ -246,7 +245,7 @@ public class NpcCarController : Driveable
         if (currentAvoidanceState == AvoidanceState.Reversing)
         {
             if (logger) logger.Log($"NPC State: Avoiding Edge - Reversing ({avoidanceTimer:F1}s left)");
-            Drive(0f, -motorTorque);
+            Drive(0f, -motorTorque, -1f);
             if (avoidanceTimer <= 0f)
             {
                 currentAvoidanceState = AvoidanceState.Turning;
@@ -259,7 +258,7 @@ public class NpcCarController : Driveable
             if (logger) logger.Log($"NPC State: Avoiding Edge - Turning { (turnDirection > 0 ? "Right" : "Left") } ({avoidanceTimer:F1}s left)");
             float turnSteerAngle = turnDirection * steerAngle * avoidanceSteerForce;
             float turnMotorTorque = motorTorque * 0.3f;
-            Drive(turnSteerAngle, turnMotorTorque);
+            Drive(turnSteerAngle, turnMotorTorque, 0.3f);
             if (avoidanceTimer <= 0f)
             {
                 currentAvoidanceState = AvoidanceState.None;

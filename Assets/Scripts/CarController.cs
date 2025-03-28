@@ -41,13 +41,13 @@ public class CarController : Driveable
         {
             speedText.text = "O_o";
             respawnText.gameObject.SetActive(true);
-            Drive(0f, 0f);
+            Drive(0f, 0f, 0f);
             return;
         }
 
         float motor = motorTorque * moveInput.y;
         float steering = steerAngle * moveInput.x;
-        Drive(steering, motor);
+        Drive(steering, motor, moveInput.y);
 
         UpdateHud();
     }
