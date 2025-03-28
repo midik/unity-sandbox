@@ -26,7 +26,7 @@ public abstract class Respawnable : MonoBehaviour
 
     private IEnumerator RespawnRoutine()
     {
-        // rb.isKinematic = true;
+        rb.isKinematic = true;
 
         transform.position = spawnPosition + Vector3.up * 0.5f;
         transform.rotation = Quaternion.Euler(spawnRotation);
@@ -35,7 +35,7 @@ public abstract class Respawnable : MonoBehaviour
 
         rb.linearVelocity = Vector3.zero;
         rb.angularVelocity = Vector3.zero;
-        // rb.isKinematic = false;
+        rb.isKinematic = false;
 
         OnRespawned(); // 🔔 событие для дочернего класса
     }
