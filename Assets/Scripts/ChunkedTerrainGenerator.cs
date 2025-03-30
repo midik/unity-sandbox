@@ -138,9 +138,8 @@ public class ChunkedTerrainGenerator : MonoBehaviour
                     if (cancelled) // Позволяем отменить генерацию
                     {
                         Debug.LogWarning("Terrain generation cancelled by user.");
-                        // Очищаем уже созданные чанки в этой сессии генерации, если отменили
                         ClearChunks();
-                        return; // Выходим из метода
+                        return;
                     }
 
                     GameObject chunkObject = GenerateSingleChunk(x, z);
@@ -161,7 +160,7 @@ public class ChunkedTerrainGenerator : MonoBehaviour
             Debug.LogError($"Error during terrain generation: {e}");
             if (!cancelled) // Если не была отмена, то это ошибка
             {
-                ClearChunks(); // Попробуем очистить в случае ошибки
+                ClearChunks();
             }
         }
         finally // Гарантированно убираем прогресс бар
@@ -196,35 +195,11 @@ public class ChunkedTerrainGenerator : MonoBehaviour
                 Debug.LogError($"CacheSplines Error: SplineContainer GameObject is invalid! InstanceID={GetInstanceID()}");
             return;
         }
-
         cachedSplines.AddRange(splineContainer.Splines);
-        // Логгируем результат всегда, если контейнер был назначен
-        Debug.Log($"CacheSplines Result: Found {cachedSplines.Count} splines in '{splineContainer.name}'. InstanceID={GetInstanceID()}");
-        if (cachedSplines.Count == 0 && (useSplineValleys || useValleySplinesForRoads))
-        {
-            Debug.LogWarning($" -> SplineContainer '{splineContainer.name}' has no splines inside!");
-        }
     }
 
     public GameObject GenerateSingleChunk(int chunkX, int chunkZ)
     {
-        // --- ПРОВЕРКА splineContainer перед использованием ---
-        if (useSplineValleys && !splineContainer)
-        {
-            Debug.LogError($"GenerateSingleChunk({chunkX},{chunkZ}): SplineContainer is NULL when needed!");
-            // Можно либо вернуть null, либо сгенерировать без долин
-            // return null;
-        }
-        // Проверка кеша (ленивая инициализация больше не нужна, т.к. стример кеширует в Start)
-        if (useSplineValleys && cachedSplines == null)
-        {
-            // Этого не должно происходить, если стример вызвал CacheSplines
-            Debug.LogError($"GenerateSingleChunk({chunkX},{chunkZ}): cachedSplines is NULL despite CacheSplines being called!");
-            // Попробуем закешировать снова на всякий случай
-            CacheSplines();
-        }
-        // --------------------------------------------------
-        
         // ... (Начало метода, создание объектов, сетки) ...
         GameObject chunk = new GameObject($"Chunk_{chunkX}_{chunkZ}");
         chunk.layer = LayerMask.NameToLayer("TerrainChunk");
@@ -266,18 +241,6 @@ public class ChunkedTerrainGenerator : MonoBehaviour
         float fullInfluenceRadius = halfSplineWidth + actualSplineValleyFalloff;
         float fullInfluenceRadiusSq = fullInfluenceRadius * fullInfluenceRadius;
         
-        bool performSplineCheck = useSplineValleys && cachedSplines != null && cachedSplines.Count > 0;
-        // Выведем только если проверка должна выполняться, но не выполняется, или если кэш пуст
-        if (useSplineValleys && !performSplineCheck)
-        {
-            Debug.LogWarning($"Chunk ({chunkX},{chunkZ}) - Spline Check SKIPPED! useSplineValleys={useSplineValleys}, cachedSplines Null?={cachedSplines == null}, Count={(cachedSplines != null ? cachedSplines.Count : -1)}");
-        }
-        
-        // --- ОТЛАДКА: Проверяем состояние перед циклом вершин ---
-        // Выведем лог один раз для каждого чанка
-        Debug.Log($"Generating Chunk ({chunkX},{chunkZ}). Spline check will be performed: {performSplineCheck}. useSplineValleys={useSplineValleys}, cachedSplines Null?={cachedSplines == null}, Spline Count={(cachedSplines != null ? cachedSplines.Count : -1)}");
-        // -------------------------------------------------------
-
         for (int z = 0; z < vertsPerLine; z++)
         {
             for (int x = 0; x < vertsPerLine; x++)
@@ -305,13 +268,6 @@ public class ChunkedTerrainGenerator : MonoBehaviour
                         minDistanceToSplineSq = math.min(minDistanceToSplineSq, distSq);
                     }
                     
-                    // --- ОТЛАДКА: Лог минимального расстояния (для первой вершины) ---
-                    bool isFirstVertex = (x == 0 && z == 0); // Для лога только первой вершины
-                    if (isFirstVertex)
-                        Debug.Log($"Chunk ({chunkX},{chunkZ}) Vert(0,0): MinDistSq={minDistanceToSplineSq:F2} (Required < {fullInfluenceRadiusSq:F2})");
-                    // ------------------------------------------------------------
-
-
                     if (minDistanceToSplineSq < fullInfluenceRadiusSq)
                     {
                         float minDistanceToSpline = math.sqrt(minDistanceToSplineSq);
@@ -325,21 +281,13 @@ public class ChunkedTerrainGenerator : MonoBehaviour
                         {
                             // Нормализуем позицию на склоне от 0 до 1
                             float t = (minDistanceToSpline - halfSplineWidth) / actualSplineValleyFalloff;
-                            // ----- ИСПОЛЬЗУЕМ КРИВУЮ -----
-                            // Передаем t в кривую. Кривая должна быть настроена так,
-                            // чтобы при t=0 значение было 1 (полная глубина), при t=1 значение было 0 (нет глубины).
                             splineFactor = valleySlopeCurve.Evaluate(t);
-                            // ---------------------------
                         }
 
                         splineFactor = math.clamp(splineFactor, 0f, 1f); // Убедимся, что фактор в [0,1]
 
                         float heightReduction = splineFactor * splineValleyDepth;
                         finalHeight = baseHeight - heightReduction;
-                        
-                        // --- ОТЛАДКА: Лог применения понижения (только для одной вершины чанка) ---
-                        if (x == 0 && z == 0) Debug.Log($" Chunk ({chunkX},{chunkZ}) Vert(0,0): Spline reduction applied! Factor={splineFactor:F2}, Reduction={heightReduction:F2}, BaseH={baseHeight:F2}, FinalH={finalHeight:F2}");
-                        //
                     }
                 }
                 // --- Конец сплайновых долин ---
@@ -384,14 +332,6 @@ public class ChunkedTerrainGenerator : MonoBehaviour
     // Функция расчета высоты БЕЗ сплайновых долин
     float GetTerrainHeight(float worldX, float worldZ)
     {
-        // --- ОТЛАДОЧНЫЙ ЛОГ для точки (42, 42) ---
-        float debugWorldX = 42.0f;
-        float debugWorldZ = 42.0f;
-        bool isDebugPoint = Mathf.Abs(worldX - debugWorldX) < (sizePerChunk / resolutionPerChunk) * 0.5f &&
-                            Mathf.Abs(worldZ - debugWorldZ) < (sizePerChunk / resolutionPerChunk) * 0.5f;
-        if (isDebugPoint) Debug.Log($"GetTerrainHeight(X={worldX:F1}, Z={worldZ:F1}) called. isPlaying={Application.isPlaying}");
-        // -----------------------------------------
-        
         // Шаг 1: Domain Warping
         float warpedX = worldX;
         float warpedZ = worldZ;
@@ -455,10 +395,6 @@ public class ChunkedTerrainGenerator : MonoBehaviour
             // Не ограничиваем здесь, ограничение будет после сплайновых долин
         }
 
-        // --- ОТЛАДОЧНЫЙ ЛОГ возвращаемого значения ---
-        if (isDebugPoint) Debug.Log($"  -> GetTerrainHeight returning: {heightAfterNoiseValleys:F2}");
-        // ------------------------------------------
-
         return heightAfterNoiseValleys;
     }
 
@@ -473,7 +409,6 @@ public class ChunkedTerrainGenerator : MonoBehaviour
         // Используем DestroyImmediate ТОЛЬКО в редакторе вне Play Mode
         if (isEditorNotInPlayMode)
         {
-            // Debug.Log("Clearing chunks using DestroyImmediate.");
             for (int i = transform.childCount - 1; i >= 0; i--)
             {
                 Transform child = transform.GetChild(i);
@@ -482,7 +417,6 @@ public class ChunkedTerrainGenerator : MonoBehaviour
         }
         else // В Play Mode (в редакторе или билде) используем Destroy
         {
-            // Debug.Log("Clearing chunks using Destroy.");
             foreach (Transform child in transform)
             {
                 if (child) Destroy(child.gameObject);

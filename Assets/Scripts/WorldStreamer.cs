@@ -25,17 +25,32 @@ public class WorldStreamer : MonoBehaviour
 
     void Start()
     {
-        if (!playerTransform) { Debug.LogError("WorldStreamer: Player Transform не назначен!", this); enabled = false; return; }
+        if (!playerTransform)
+        {
+            Debug.LogError("WorldStreamer: Player Transform не назначен!", this);
+            enabled = false;
+            return;
+        }
 
         terrainGenerator = GetComponent<ChunkedTerrainGenerator>();
-        if (!terrainGenerator) { Debug.LogError("WorldStreamer: Terrain Generator (на этом же объекте) не найден!", this); enabled = false; return; }
+        if (!terrainGenerator)
+        {
+            Debug.LogError("WorldStreamer: Terrain Generator (на этом же объекте) не найден!", this);
+            enabled = false;
+            return;
+        }
 
         chunkSize = terrainGenerator.sizePerChunk;
-        if (chunkSize <= 0) { Debug.LogError("WorldStreamer: Chunk Size is zero or negative!", this); enabled = false; return; }
+        if (chunkSize <= 0)
+        {
+            Debug.LogError("WorldStreamer: Chunk Size is zero or negative!", this);
+            enabled = false;
+            return;
+        }
 
         // Очистка перед стартом (удаляем старый родитель и чанки от редактора)
         Transform existingParent = transform.Find("Active Terrain Chunks");
-        
+
         if (existingParent) Destroy(existingParent.gameObject);
         terrainGenerator.ClearChunks(); // Удаляем дочерние у генератора
         activeChunkObjects.Clear();
@@ -68,7 +83,7 @@ public class WorldStreamer : MonoBehaviour
     {
         // Пропускаем первый кадр, чтобы UpdateChunks в Start успел отработать
         yield return null;
-        
+
         while (true) // Бесконечный цикл
         {
             UpdateChunks(); // Выполняем проверку
@@ -77,7 +92,7 @@ public class WorldStreamer : MonoBehaviour
     }
 
     // Основная логика проверки и обновления чанков
-        void UpdateChunks()
+    void UpdateChunks()
     {
         Vector2Int newPlayerChunkCoord = GetChunkCoordFromPos(playerTransform.position);
         if (newPlayerChunkCoord == lastPlayerChunkCoord) return;
@@ -86,11 +101,23 @@ public class WorldStreamer : MonoBehaviour
 
         // 1. Определяем необходимые координаты
         HashSet<Vector2Int> requiredCoords = new HashSet<Vector2Int>();
-        for (int x = -loadRadius; x <= loadRadius; x++) { for (int z = -loadRadius; z <= loadRadius; z++) { requiredCoords.Add(new Vector2Int(lastPlayerChunkCoord.x + x, lastPlayerChunkCoord.y + z)); } }
+        for (int x = -loadRadius; x <= loadRadius; x++)
+        {
+            for (int z = -loadRadius; z <= loadRadius; z++)
+            {
+                requiredCoords.Add(new Vector2Int(lastPlayerChunkCoord.x + x, lastPlayerChunkCoord.y + z));
+            }
+        }
 
         // 2. Находим чанки для выгрузки
         List<Vector2Int> coordsToUnload = new List<Vector2Int>();
-        foreach (Vector2Int activeCoord in activeChunkObjects.Keys) { if (!requiredCoords.Contains(activeCoord)) { coordsToUnload.Add(activeCoord); } }
+        foreach (Vector2Int activeCoord in activeChunkObjects.Keys)
+        {
+            if (!requiredCoords.Contains(activeCoord))
+            {
+                coordsToUnload.Add(activeCoord);
+            }
+        }
 
         // 3. Выгружаем (деактивируем и помещаем в пул-СЛОВАРЬ)
         foreach (Vector2Int coordToUnload in coordsToUnload)
@@ -98,14 +125,16 @@ public class WorldStreamer : MonoBehaviour
             if (activeChunkObjects.TryGetValue(coordToUnload, out GameObject chunkObject))
             {
                 chunkObject.SetActive(false);
-                // !!! ИЗМЕНЕНО: Добавляем в словарь, а не в очередь !!!
-                if (!chunkPool.ContainsKey(coordToUnload)) // Доп. проверка на всякий случай
+                if (!chunkPool.ContainsKey(coordToUnload))
                 {
-                     chunkPool.Add(coordToUnload, chunkObject);
-                } else {
+                    chunkPool.Add(coordToUnload, chunkObject);
+                }
+                else
+                {
                     Debug.LogWarning($"Chunk {coordToUnload} already in pool? Destroying instead.");
                     Destroy(chunkObject); // Если уже есть в пуле, уничтожаем дубликат
                 }
+
                 // ----------------------------------------------
                 activeChunkObjects.Remove(coordToUnload);
             }
@@ -127,10 +156,11 @@ public class WorldStreamer : MonoBehaviour
 
                         // Убедимся, что позиция правильная (хотя она не должна была меняться)
                         Vector3 expectedPosition = new Vector3(coordToLoad.x * chunkSize, 0, coordToLoad.y * chunkSize);
-                        if(pooledChunk.transform.position != expectedPosition) {
-                            // Debug.LogWarning($"Repositioning pooled chunk {coordToLoad}");
+                        if (pooledChunk.transform.position != expectedPosition)
+                        {
                             pooledChunk.transform.position = expectedPosition;
                         }
+
                         pooledChunk.transform.parent = chunkParent;
                         pooledChunk.name = $"Chunk_{coordToLoad.x}_{coordToLoad.y} (Pooled)";
                         pooledChunk.SetActive(true); // Активируем
@@ -183,15 +213,14 @@ public class WorldStreamer : MonoBehaviour
         }
         else if (stillRequired)
         {
-            // Debug.Log($"Finished GENERATING chunk: {coord}");
             chunkObject.name = $"Chunk_{coord.x}_{coord.y} (Generated)"; // Имя для нового
             chunkObject.transform.parent = chunkParent; // Устанавливаем родителя
             activeChunkObjects.Add(coord, chunkObject); // Добавляем в активные
         }
         else
         {
-            // Debug.Log($"Chunk {coord} no longer required after generation, destroying.");
-            Destroy(chunkObject); // Уничтожаем свежесгенерированный, но уже ненужный
+            Debug.Log($"Chunk {coord} no longer required after generation, destroying.");
+            Destroy(chunkObject);
         }
 
         // Убираем из списка загружаемых
@@ -218,5 +247,4 @@ public class WorldStreamer : MonoBehaviour
         Debug.Log("Generating roads after delay...");
         terrainGenerator.GenerateRoads();
     }
-
 }

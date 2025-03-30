@@ -33,7 +33,7 @@ public class CarAudioController : MonoBehaviour
     // Текущие значения для плавности
     private float currentPitch = 1.0f;
     private float currentVolume = 0.6f;
-    private float currentMotorInput = 0f; // Храним текущий газ
+    // private float currentMotorInput = 0f; // Храним текущий газ
 
 
     void Start()
