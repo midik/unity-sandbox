@@ -10,7 +10,7 @@ public class ChunkDeformerManager : MonoBehaviour
 
     private void Start()
     {
-        generator = GetComponentInParent<ChunkedTerrainGenerator>();
+        generator = GameObject.Find("WorldStreamer").GetComponent<ChunkedTerrainGenerator>();
         deformer = GetComponent<MeshDeformer>();
         var meshFilter = GetComponent<MeshFilter>();
 
