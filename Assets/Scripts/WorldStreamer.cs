@@ -9,7 +9,8 @@ using UnityEngine.Splines;
 
 public class WorldStreamer : MonoBehaviour
 {
-    [Header("Core Settings")] [Tooltip("Объект игрока (или камеры), за которым следим")]
+    [Header("Core Settings")]
+    [Tooltip("Объект игрока (или камеры), за которым следим")]
     public Transform playerTransform;
 
     [Tooltip("Радиус загрузки чанков вокруг игрока (в чанках)")]
@@ -18,18 +19,26 @@ public class WorldStreamer : MonoBehaviour
     [Tooltip("Как часто проверять необходимость загрузки/выгрузки (в секундах)")]
     public float checkInterval = 0.5f;
 
+    // --- НОВОЕ: Добавляем настройку и очереди ---
+    [Tooltip("Сколько чанков активировать/деактивировать максимум за кадр")]
+    public int chunksPerFrame = 2; // Настрой это значение для баланса
+
     private Dictionary<Vector2Int, GameObject> activeChunkObjects = new Dictionary<Vector2Int, GameObject>();
     private HashSet<Vector2Int> loadingChunks = new HashSet<Vector2Int>();
     private Dictionary<Vector2Int, GameObject> chunkPool = new Dictionary<Vector2Int, GameObject>();
 
+    private Queue<Vector2Int> activationQueue = new Queue<Vector2Int>();
+    private Queue<Vector2Int> deactivationQueue = new Queue<Vector2Int>();
+    // --- Конец новых полей ---
+
     // Координаты чанка, в котором игрок находился при последней проверке
     private Vector2Int lastPlayerChunkCoord = new Vector2Int(int.MinValue, int.MinValue);
     private float chunkSize; // Размер чанка для расчетов
-    private Transform chunkParent; // Родительский объект для порядка в иерархии
     private ChunkedTerrainGenerator terrainGenerator;
 
     void Start()
     {
+        // --- Проверки и инициализация ---
         if (!playerTransform)
         {
             Debug.LogError("WorldStreamer: Player Transform не назначен!", this);
@@ -53,50 +62,84 @@ public class WorldStreamer : MonoBehaviour
             return;
         }
 
-        // Очистка перед стартом (удаляем старый родитель и чанки от редактора)
-        Transform existingParent = transform.Find("Active Terrain Chunks");
+        HandlePreGeneratedChunks();
 
-        if (existingParent) Destroy(existingParent.gameObject);
-        terrainGenerator.ClearChunks(); // Удаляем дочерние у генератора
-        activeChunkObjects.Clear();
-        loadingChunks.Clear();
-        chunkPool.Clear(); // Очищаем пул
-
-        // Создаем новый родительский объект
-        chunkParent = new GameObject("Active Terrain Chunks").transform;
-        chunkParent.parent = this.transform;
-
-        // Кешируем сплайны - ВАЖНО сделать это до первой UpdateChunks
-        Debug.Log("WorldStreamer: Calling CacheSplines...");
-        terrainGenerator.CacheSplines();
-
+        // Запускаем основной цикл проверки чанков
         Debug.Log("World Streamer Initialized. Starting chunk check loop.");
         StartCoroutine(ChunkCheckLoop());
 
-        // Первая проверка чанков сразу, чтобы не ждать checkInterval
-        UpdateChunks();
-
-        // Генерация дорог (после первой проверки)
+        // Генерация дорог запускается с задержкой
         if (terrainGenerator.generateRoad)
         {
-            StartCoroutine(GenerateRoadsAfterDelay(checkInterval + 0.1f));
+            // StartCoroutine(GenerateRoadsAfterDelay(checkInterval + 0.1f));
         }
     }
 
-    // Корутина для периодической проверки чанков
+    private void HandlePreGeneratedChunks()
+    {
+        // --- Логика инициализации с предзагрузкой из редактора ---
+        activeChunkObjects.Clear();
+        loadingChunks.Clear();
+        chunkPool.Clear(); // Очищаем пул перед заполнением
+        
+        Vector2Int layerChunkCoord = GetChunkCoordFromPos(playerTransform.position); 
+
+        Debug.Log("Searching for pre-generated chunks...");
+        // Ищем существующие чанки, которые являются дочерними для TerrainGenerator
+        foreach (Transform child in terrainGenerator.transform)
+        {
+            if (child.name.StartsWith("Chunk_"))
+            {
+                Vector2Int coord = GetChunkCoordFromPos(child.position);
+                if (!chunkPool.ContainsKey(coord))
+                {
+                    // если чанк вне радиуса загрузки, деактивируем его
+                    if (Mathf.Abs(coord.x - layerChunkCoord.x) > loadRadius ||
+                        Mathf.Abs(coord.y - layerChunkCoord.y) > loadRadius)
+                    {
+                        // Деактивируем объект, чтобы не мешал
+                        child.gameObject.SetActive(false);
+                    }
+                    
+                    chunkPool.Add(coord, child.gameObject);
+                }
+                else
+                {
+                    Debug.LogWarning($"Duplicate chunk found at coord {coord} during pre-population? Object: {child.name}. Keeping the one already in pool.", child.gameObject);
+                }
+            }
+        }
+        Debug.Log($"Found and pooled {chunkPool.Count} pre-generated chunks.");
+        // --- Конец инициализации ---
+    }
+
+    // --- ИЗМЕНЕНО: Корутина для периодической проверки и обработки очередей ---
     IEnumerator ChunkCheckLoop()
     {
-        // Пропускаем первый кадр, чтобы UpdateChunks в Start успел отработать
+        // Инициализация перед циклом
+        terrainGenerator.CacheSplines(); // Кешируем сплайны здесь, один раз перед началом цикла
+        Debug.Log("World Streamer loop starting.");
+
+        // Пропускаем первый кадр
         yield return null;
 
         while (true) // Бесконечный цикл
         {
-            UpdateChunks(); // Выполняем проверку
-            yield return new WaitForSeconds(checkInterval); // Ждем интервал
+            // 1. Определяем, какие чанки нужны/не нужны и заполняем очереди
+            UpdateChunks();
+
+            // 2. Обрабатываем очередь активации (порциями)
+            yield return ProcessActivationQueue();
+
+            // 3. Обрабатываем очередь деактивации (порциями)
+            yield return ProcessDeactivationQueue();
+
+            // 4. Ждем перед следующей проверкой
+            yield return new WaitForSeconds(checkInterval);
         }
     }
 
-    // Основная логика проверки и обновления чанков
+    // --- ИЗМЕНЕНО: Основная логика теперь только заполняет очереди ---
     void UpdateChunks()
     {
         Vector2Int newPlayerChunkCoord = GetChunkCoordFromPos(playerTransform.position);
@@ -114,84 +157,125 @@ public class WorldStreamer : MonoBehaviour
             }
         }
 
-        // 2. Находим чанки для выгрузки
-        List<Vector2Int> coordsToUnload = new List<Vector2Int>();
-        foreach (Vector2Int activeCoord in activeChunkObjects.Keys)
+        // 2. Находим активные чанки для выгрузки -> добавляем в очередь деактивации
+        List<Vector2Int> activeCoordsToCheck = activeChunkObjects.Keys.ToList(); // Копия ключей
+        foreach (Vector2Int activeCoord in activeCoordsToCheck)
         {
             if (!requiredCoords.Contains(activeCoord))
             {
-                coordsToUnload.Add(activeCoord);
+                // Проверяем, не в очереди ли уже или не грузится ли
+                if (!deactivationQueue.Contains(activeCoord) && !loadingChunks.Contains(activeCoord))
+                {
+                    deactivationQueue.Enqueue(activeCoord);
+                }
             }
         }
 
-        // 3. Выгружаем (деактивируем и помещаем в пул-СЛОВАРЬ)
-        foreach (Vector2Int coordToUnload in coordsToUnload)
-        {
-            if (activeChunkObjects.TryGetValue(coordToUnload, out GameObject chunkObject))
-            {
-                chunkObject.SetActive(false);
-                if (!chunkPool.ContainsKey(coordToUnload))
-                {
-                    chunkPool.Add(coordToUnload, chunkObject);
-                }
-                else
-                {
-                    Debug.LogWarning($"Chunk {coordToUnload} already in pool? Destroying instead.");
-                    Destroy(chunkObject); // Если уже есть в пуле, уничтожаем дубликат
-                }
-
-                // ----------------------------------------------
-                activeChunkObjects.Remove(coordToUnload);
-            }
-        }
-
-        // 4. Загружаем/активируем новые необходимые чанки
+        // 3. Находим необходимые неактивные чанки -> добавляем в очередь активации или генерируем
         foreach (Vector2Int coordToLoad in requiredCoords)
         {
-            if (!activeChunkObjects.ContainsKey(coordToLoad)) // Не активен?
+            // Если не активен и не грузится...
+            if (activeChunkObjects.ContainsKey(coordToLoad) || loadingChunks.Contains(coordToLoad)) continue;
+            
+            // ...и не в очереди на активацию...
+            if (activationQueue.Contains(coordToLoad)) continue;
+            
+            // .. и координаты в пределах мира
+            if (!IsCoordinatesInWorld(coordToLoad)) continue;
+            
+            // ...проверяем пул.
+            if (chunkPool.ContainsKey(coordToLoad))
             {
-                if (!loadingChunks.Contains(coordToLoad)) // Не загружается?
-                {
-                    // ---> ИЗМЕНЕНО: Проверяем наличие в пуле-СЛОВАРЕ <---
-                    if (chunkPool.ContainsKey(coordToLoad))
-                    {
-                        // --- Используем объект из пула ---
-                        GameObject pooledChunk = chunkPool[coordToLoad]; // Берем по ключу
-                        chunkPool.Remove(coordToLoad); // Удаляем из пула
-
-                        // Убедимся, что позиция правильная (хотя она не должна была меняться)
-                        Vector3 expectedPosition = new Vector3(coordToLoad.x * chunkSize, 0, coordToLoad.y * chunkSize);
-                        if (pooledChunk.transform.position != expectedPosition)
-                        {
-                            pooledChunk.transform.position = expectedPosition;
-                        }
-
-                        pooledChunk.transform.parent = chunkParent;
-                        pooledChunk.name = $"Chunk_{coordToLoad.x}_{coordToLoad.y} (Pooled)";
-                        pooledChunk.SetActive(true); // Активируем
-                        activeChunkObjects.Add(coordToLoad, pooledChunk); // Добавляем в активные
-                    }
-                    // -----------------------------------------
-                    else
-                    {
-                        // --- Пул пуст или нет нужного чанка - генерируем новый ---
-                        loadingChunks.Add(coordToLoad);
-                        StartCoroutine(LoadChunkCoroutine(coordToLoad));
-                    }
-                }
+                // Есть в пуле -> в очередь активации
+                activationQueue.Enqueue(coordToLoad);
+            }
+            else
+            {
+                // Нет в пуле -> запускаем генерацию
+                loadingChunks.Add(coordToLoad);
+                StartCoroutine(LoadChunkCoroutine(coordToLoad));
             }
         }
     }
 
+    // --- НОВОЕ: Корутина для обработки очереди активации ---
+    IEnumerator ProcessActivationQueue() {
+        int processedCount = 0;
+        while (activationQueue.Count > 0 && processedCount < chunksPerFrame) {
+            Vector2Int coordToActivate = activationQueue.Dequeue();
+
+            // Проверяем актуальность ПЕРЕД действием
+            if (!IsChunkStillRequired(coordToActivate) || activeChunkObjects.ContainsKey(coordToActivate) ||
+                loadingChunks.Contains(coordToActivate)) continue;
+            
+            if (chunkPool.TryGetValue(coordToActivate, out GameObject pooledChunk))
+            {
+                chunkPool.Remove(coordToActivate); // Удаляем из пула
+
+                // Настраиваем объект
+                Vector3 expectedPosition = new Vector3(coordToActivate.x * chunkSize, 0, coordToActivate.y * chunkSize);
+                if (pooledChunk.transform.position != expectedPosition) {
+                    Debug.LogWarning($"Chunk {coordToActivate} position incorrect in pool. Resetting.");
+                    pooledChunk.transform.position = expectedPosition;
+                }
+                pooledChunk.transform.SetParent(this.transform, true);
+                pooledChunk.name = $"Chunk_{coordToActivate.x}_{coordToActivate.y} (Pooled)";
+
+                // Активация
+                pooledChunk.SetActive(true);
+
+                activeChunkObjects.Add(coordToActivate, pooledChunk);
+                processedCount++;
+                yield return null; // Пауза ПОСЛЕ активации
+            } else {
+                // Нет в пуле, хотя был в очереди. Логируем.
+                if (!activeChunkObjects.ContainsKey(coordToActivate))
+                    Debug.LogWarning($"Chunk {coordToActivate} was in activation queue but not found in pool and not active!");
+            }
+        }
+    }
+
+    // --- НОВОЕ: Корутина для обработки очереди деактивации ---
+    IEnumerator ProcessDeactivationQueue() {
+         int processedCount = 0;
+         while (deactivationQueue.Count > 0 && processedCount < chunksPerFrame) {
+            Vector2Int coordToDeactivate = deactivationQueue.Dequeue();
+
+            // Проверяем актуальность ПЕРЕД действием
+            if (activeChunkObjects.TryGetValue(coordToDeactivate, out GameObject chunkObject)
+                && !IsChunkStillRequired(coordToDeactivate)
+                && !activationQueue.Contains(coordToDeactivate)) // Не деактивируем то, что ждет активации
+            {
+                 // Деактивация
+                 chunkObject.SetActive(false);
+
+                 activeChunkObjects.Remove(coordToDeactivate);
+
+                // Возвращаем в пул
+                if (!chunkPool.ContainsKey(coordToDeactivate)) {
+                    chunkPool.Add(coordToDeactivate, chunkObject);
+                } else {
+                    Debug.LogWarning($"Chunk {coordToDeactivate} already in pool during deactivation? Destroying instead.");
+                    Destroy(chunkObject);
+                }
+                processedCount++;
+            }
+         }
+         // Пауза в конце, если что-то обработали
+         if (processedCount > 0) yield return null;
+    }
+
+    // --- ИЗМЕНЕНО: Корутина генерации (полная версия с измененным финалом) ---
     IEnumerator LoadChunkCoroutine(Vector2Int coord)
     {
         int chunkX = coord.x;
         int chunkZ = coord.y;
 
-        GameObject chunkObject = new GameObject($"Chunk_{chunkX}_{chunkZ}");
+        // Создаем объект и добавляем базовые компоненты
+        GameObject chunkObject = new GameObject($"Chunk_{chunkX}_{chunkZ} (Generating)");
         chunkObject.layer = LayerMask.NameToLayer("TerrainChunk");
         chunkObject.transform.position = new Vector3(chunkX * terrainGenerator.sizePerChunk, 0, chunkZ * terrainGenerator.sizePerChunk);
-        chunkObject.transform.parent = chunkParent;
+        chunkObject.transform.parent = this.transform;
 
         MeshFilter mf = chunkObject.AddComponent<MeshFilter>();
         MeshRenderer mr = chunkObject.AddComponent<MeshRenderer>();
@@ -199,6 +283,7 @@ public class WorldStreamer : MonoBehaviour
         MeshCollider mc = chunkObject.AddComponent<MeshCollider>();
         mc.material = terrainGenerator.physicsMaterial;
 
+        // Добавление кастомных компонентов
         if (!chunkObject.GetComponent<MeshDeformer>())
         {
             MeshDeformer md = chunkObject.AddComponent<MeshDeformer>();
@@ -206,34 +291,32 @@ public class WorldStreamer : MonoBehaviour
             md.deformStrength = terrainGenerator.deformStrength;
             md.maxDeformDepth = terrainGenerator.maxDeformDepth;
         }
-
         if (!chunkObject.GetComponent<ChunkDeformerManager>())
         {
             chunkObject.AddComponent<ChunkDeformerManager>();
         }
 
+        // --- Генерация меша ---
         Mesh mesh = new Mesh();
         mesh.name = $"TerrainMesh_{chunkX}_{chunkZ}";
         int vertsPerLine = terrainGenerator.resolutionPerChunk + 1;
         int totalVertices = vertsPerLine * vertsPerLine;
 
-        // Подготовка данных для Job
-        NativeArray<float> heights = new NativeArray<float>(totalVertices, Allocator.TempJob);
-        
-        // Предвычисление кривой высот
+        // Выделение NativeArrays (Allocator.Persistent)
+        NativeArray<float> heights = new NativeArray<float>(totalVertices, Allocator.Persistent);
         int curveSamples = 256;
-        NativeArray<float> heightCurveValues = new NativeArray<float>(curveSamples, Allocator.TempJob);
+        NativeArray<float> heightCurveValues = new NativeArray<float>(curveSamples, Allocator.Persistent);
+        NativeArray<float> splineFactors = new NativeArray<float>(totalVertices, Allocator.Persistent);
+
+        // Расчет heightCurveValues
         for (int i = 0; i < curveSamples; i++)
         {
             float t = (float)i / (curveSamples - 1);
             heightCurveValues[i] = terrainGenerator.heightCurve.Evaluate(t);
         }
 
-        // Предвычисление влияния сплайнов - вынесено в главный поток корутины для распределения нагрузки
-        NativeArray<float> splineFactors = new NativeArray<float>(totalVertices, Allocator.TempJob);
+        // Расчет splineFactors (с yield внутри)
         float step = terrainGenerator.sizePerChunk / terrainGenerator.resolutionPerChunk;
-        
-        // Рассчитываем splineFactors в главном потоке, но распределенно по времени
         if (terrainGenerator.useSplineValleys && terrainGenerator.cachedSplines != null && terrainGenerator.cachedSplines.Count > 0)
         {
             for (int z = 0; z < vertsPerLine; z++)
@@ -258,7 +341,11 @@ public class WorldStreamer : MonoBehaviour
                     float minDistanceToSpline = math.sqrt(minDistSq);
                     float splineFactor = 0f;
                     float halfWidth = terrainGenerator.splineValleyWidth / 2f;
-                    if (minDistanceToSpline <= halfWidth)
+                    if (terrainGenerator.cutoffToBottom)
+                    {
+                        splineFactor = 0f;
+                    }
+                    else if (minDistanceToSpline <= halfWidth)
                     {
                         splineFactor = 1.0f;
                     }
@@ -285,7 +372,7 @@ public class WorldStreamer : MonoBehaviour
             }
         }
 
-        // Запуск основного Job с предвычисленными splineFactors
+        // Настройка и запуск TerrainHeightJob
         TerrainHeightJob job = new TerrainHeightJob
         {
             vertsPerLine = vertsPerLine,
@@ -315,20 +402,15 @@ public class WorldStreamer : MonoBehaviour
             useSplineValleys = terrainGenerator.useSplineValleys,
             splineFactors = splineFactors, // Передаём предвычисленные значения влияния сплайнов
             splineValleyDepth = terrainGenerator.splineValleyDepth,
-            heights = heights
+            heights = heights // Выходной массив
         };
-
-        // Запуск задачи асинхронно
         JobHandle handle = job.Schedule(totalVertices, 64);
 
-        // Асинхронное ожидание завершения Job
-        while (!handle.IsCompleted)
-        {
-            yield return null;
-        }
+        // Ожидание Job
+        while (!handle.IsCompleted) yield return null;
         handle.Complete();
 
-        // Создание меша
+        // Создание vertices, uvs, triangles из heights
         Vector3[] vertices = new Vector3[totalVertices];
         Vector2[] uvs = new Vector2[totalVertices];
         for (int i = 0; i < totalVertices; i++)
@@ -359,6 +441,7 @@ public class WorldStreamer : MonoBehaviour
             }
         }
 
+        // Применение к mesh и коллайдеру
         mesh.vertices = vertices;
         mesh.uv = uvs;
         mesh.triangles = triangles;
@@ -370,33 +453,54 @@ public class WorldStreamer : MonoBehaviour
         // Освобождение памяти
         heights.Dispose();
         heightCurveValues.Dispose();
-        splineFactors.Dispose(); // Обязательно освобождаем память
+        splineFactors.Dispose();
+        // --- Конец генерации меша ---
 
-        // Проверка актуальности чанка
-        Vector2Int latestPlayerChunkCoord = GetChunkCoordFromPos(playerTransform.position);
-        bool stillRequired = false;
-        int checkRadiusSq = loadRadius * loadRadius;
-        if (SqrMagnitude(coord - latestPlayerChunkCoord) <= checkRadiusSq * 2)
+        // ---> Решаем судьбу сгенерированного чанка <---
+        bool stillRequired = IsChunkStillRequired(coord); // Используем новую проверку
+
+        if (!chunkObject) // Проверка на уничтожение извне
         {
-            stillRequired = true;
+            Debug.LogError($"Chunk object {coord} was destroyed during generation!");
+            loadingChunks.Remove(coord);
+            yield break;
         }
 
-        if (!chunkObject)
+        if (stillRequired)
         {
-            Debug.LogError($"Chunk object for {coord} is null after generation attempt.");
-        }
-        else if (stillRequired)
-        {
+            // Нужен -> Активируем СРАЗУ (т.к. запросили явно)
+            // chunkObject.transform.SetParent(chunkParent, true);
             chunkObject.name = $"Chunk_{coord.x}_{coord.y} (Generated)";
+            chunkObject.SetActive(true);
             activeChunkObjects.Add(coord, chunkObject);
         }
         else
         {
-            Debug.Log($"Chunk {coord} no longer required after generation, destroying.");
-            Destroy(chunkObject);
+            // Уже не нужен -> В пул
+            Debug.Log($"Chunk {coord} no longer required after generation, adding to pool.");
+            chunkObject.SetActive(false);
+            if (!chunkPool.ContainsKey(coord))
+            {
+                chunkObject.transform.SetParent(this.transform, true); // Переносим под родителя стримера
+                chunkPool.Add(coord, chunkObject);
+            }
+            else
+            {
+                Destroy(chunkObject); // Уничтожаем дубликат
+            }
         }
 
+        // Убираем из списка загружаемых
         loadingChunks.Remove(coord);
+    }
+
+    // --- НОВОЕ: Вспомогательная функция для проверки актуальности чанка ---
+    bool IsChunkStillRequired(Vector2Int coord) {
+        Vector2Int currentCenterChunk = GetChunkCoordFromPos(playerTransform.position);
+        int deltaX = Mathf.Abs(coord.x - currentCenterChunk.x);
+        int deltaY = Mathf.Abs(coord.y - currentCenterChunk.y);
+        int effectiveRadius = loadRadius; // Можно сделать loadRadius + 1 для буфера
+        return deltaX <= effectiveRadius && deltaY <= effectiveRadius;
     }
 
     // Вспомогательная функция для получения координат чанка из мировой позиции
@@ -407,16 +511,21 @@ public class WorldStreamer : MonoBehaviour
         return new Vector2Int(x, z);
     }
 
-    // Вспомогательная функция для квадрата расстояния между Vector2Int
-    float SqrMagnitude(Vector2Int vec)
-    {
-        return vec.x * vec.x + vec.y * vec.y;
-    }
-
+    // Корутина для отложенной генерации дорог
     IEnumerator GenerateRoadsAfterDelay(float delay)
     {
         yield return new WaitForSeconds(delay);
         Debug.Log("Generating roads after delay...");
-        terrainGenerator.GenerateRoads();
+        if (terrainGenerator)
+        {
+             terrainGenerator.GenerateRoads();
+        } else {
+             Debug.LogError("Cannot generate roads, TerrainGenerator is missing!");
+        }
+    }
+    
+    bool IsCoordinatesInWorld(Vector2Int coord)
+    {
+        return coord.x >= 0 && coord.y >= 0 && coord.x < terrainGenerator.chunksX && coord.y < terrainGenerator.chunksZ;
     }
 }

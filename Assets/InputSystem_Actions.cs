@@ -198,6 +198,33 @@ public partial class @InputSystem_Actions: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""ToggleGearMode"",
+                    ""type"": ""Button"",
+                    ""id"": ""d15fff35-139d-4871-99e8-949846ae40bd"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""Gear Up"",
+                    ""type"": ""Button"",
+                    ""id"": ""50145bf1-f687-4c51-bb6e-1b053e94b132"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""Gear Down"",
+                    ""type"": ""Button"",
+                    ""id"": ""60acbf1c-3fcb-4eff-8242-26b1fc15451b"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
                 }
             ],
             ""bindings"": [
@@ -616,6 +643,39 @@ public partial class @InputSystem_Actions: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""groups"": "";Keyboard&Mouse"",
                     ""action"": ""ToggleDrivetrainMode"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""24ffd590-38aa-4314-9140-893d8fad57e0"",
+                    ""path"": ""<Keyboard>/g"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""ToggleGearMode"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""8d6f3273-774c-442e-8c76-843115f8cf5e"",
+                    ""path"": ""<Keyboard>/leftShift"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Gear Up"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""b25254a9-c61a-4430-b32e-d99a8c41cd3a"",
+                    ""path"": ""<Keyboard>/leftCtrl"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Gear Down"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
                 }
@@ -1215,6 +1275,9 @@ public partial class @InputSystem_Actions: IInputActionCollection2, IDisposable
         m_Player_Handbrake = m_Player.FindAction("Handbrake", throwIfNotFound: true);
         m_Player_Respawn = m_Player.FindAction("Respawn", throwIfNotFound: true);
         m_Player_ToggleDrivetrainMode = m_Player.FindAction("ToggleDrivetrainMode", throwIfNotFound: true);
+        m_Player_ToggleGearMode = m_Player.FindAction("ToggleGearMode", throwIfNotFound: true);
+        m_Player_GearUp = m_Player.FindAction("Gear Up", throwIfNotFound: true);
+        m_Player_GearDown = m_Player.FindAction("Gear Down", throwIfNotFound: true);
         // UI
         m_UI = asset.FindActionMap("UI", throwIfNotFound: true);
         m_UI_Navigate = m_UI.FindAction("Navigate", throwIfNotFound: true);
@@ -1320,6 +1383,9 @@ public partial class @InputSystem_Actions: IInputActionCollection2, IDisposable
     private readonly InputAction m_Player_Handbrake;
     private readonly InputAction m_Player_Respawn;
     private readonly InputAction m_Player_ToggleDrivetrainMode;
+    private readonly InputAction m_Player_ToggleGearMode;
+    private readonly InputAction m_Player_GearUp;
+    private readonly InputAction m_Player_GearDown;
     /// <summary>
     /// Provides access to input actions defined in input action map "Player".
     /// </summary>
@@ -1379,6 +1445,18 @@ public partial class @InputSystem_Actions: IInputActionCollection2, IDisposable
         /// Provides access to the underlying input action "Player/ToggleDrivetrainMode".
         /// </summary>
         public InputAction @ToggleDrivetrainMode => m_Wrapper.m_Player_ToggleDrivetrainMode;
+        /// <summary>
+        /// Provides access to the underlying input action "Player/ToggleGearMode".
+        /// </summary>
+        public InputAction @ToggleGearMode => m_Wrapper.m_Player_ToggleGearMode;
+        /// <summary>
+        /// Provides access to the underlying input action "Player/GearUp".
+        /// </summary>
+        public InputAction @GearUp => m_Wrapper.m_Player_GearUp;
+        /// <summary>
+        /// Provides access to the underlying input action "Player/GearDown".
+        /// </summary>
+        public InputAction @GearDown => m_Wrapper.m_Player_GearDown;
         /// <summary>
         /// Provides access to the underlying input action map instance.
         /// </summary>
@@ -1441,6 +1519,15 @@ public partial class @InputSystem_Actions: IInputActionCollection2, IDisposable
             @ToggleDrivetrainMode.started += instance.OnToggleDrivetrainMode;
             @ToggleDrivetrainMode.performed += instance.OnToggleDrivetrainMode;
             @ToggleDrivetrainMode.canceled += instance.OnToggleDrivetrainMode;
+            @ToggleGearMode.started += instance.OnToggleGearMode;
+            @ToggleGearMode.performed += instance.OnToggleGearMode;
+            @ToggleGearMode.canceled += instance.OnToggleGearMode;
+            @GearUp.started += instance.OnGearUp;
+            @GearUp.performed += instance.OnGearUp;
+            @GearUp.canceled += instance.OnGearUp;
+            @GearDown.started += instance.OnGearDown;
+            @GearDown.performed += instance.OnGearDown;
+            @GearDown.canceled += instance.OnGearDown;
         }
 
         /// <summary>
@@ -1488,6 +1575,15 @@ public partial class @InputSystem_Actions: IInputActionCollection2, IDisposable
             @ToggleDrivetrainMode.started -= instance.OnToggleDrivetrainMode;
             @ToggleDrivetrainMode.performed -= instance.OnToggleDrivetrainMode;
             @ToggleDrivetrainMode.canceled -= instance.OnToggleDrivetrainMode;
+            @ToggleGearMode.started -= instance.OnToggleGearMode;
+            @ToggleGearMode.performed -= instance.OnToggleGearMode;
+            @ToggleGearMode.canceled -= instance.OnToggleGearMode;
+            @GearUp.started -= instance.OnGearUp;
+            @GearUp.performed -= instance.OnGearUp;
+            @GearUp.canceled -= instance.OnGearUp;
+            @GearDown.started -= instance.OnGearDown;
+            @GearDown.performed -= instance.OnGearDown;
+            @GearDown.canceled -= instance.OnGearDown;
         }
 
         /// <summary>
@@ -1872,6 +1968,27 @@ public partial class @InputSystem_Actions: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnToggleDrivetrainMode(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "ToggleGearMode" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnToggleGearMode(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "Gear Up" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnGearUp(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "Gear Down" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnGearDown(InputAction.CallbackContext context);
     }
     /// <summary>
     /// Interface to implement callback methods for all input action callbacks associated with input actions defined by "UI" which allows adding and removing callbacks.

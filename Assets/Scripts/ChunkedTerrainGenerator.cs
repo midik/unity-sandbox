@@ -45,6 +45,7 @@ public class ChunkedTerrainGenerator : MonoBehaviour
     public float valleyNoiseOffsetZ = 4000f; // Смещение шума долин Z
 
     [Header("Valleys (Spline Based)")] public bool useSplineValleys = true; // Включить/выключить сплайновые долины
+    public bool cutoffToBottom = true; // Срезать долину до дна (упрощенный вариант)
     public SplineContainer splineContainer; // Сюда перетащить объект со сплайнами из сцены
     public float splineValleyWidth = 5f; // Ширина плоского дна долины
     public float splineValleyDepth = 6f; // Глубина долины в центре относительно окружающего рельефа
@@ -561,6 +562,7 @@ public class ChunkedTerrainGenerator : MonoBehaviour
             {
                 GameObject roadSegment = new GameObject($"Road_Spline_{roadSegmentIndex}");
                 roadSegment.transform.parent = roads.transform;
+                roadSegment.layer = roads.layer;
                 Mesh roadMesh = new Mesh { name = $"RoadMesh_{roadSegmentIndex}" };
                 roadMesh.SetVertices(vertices); // Используем SetVertices для List<Vector3>
                 roadMesh.SetUVs(0, uvs); // Используем SetUVs для List<Vector2>
@@ -571,8 +573,8 @@ public class ChunkedTerrainGenerator : MonoBehaviour
                 roadMF.mesh = roadMesh;
                 MeshRenderer roadMR = roadSegment.AddComponent<MeshRenderer>();
                 roadMR.material = roadMaterial;
-                // MeshCollider roadMC = roadSegment.AddComponent<MeshCollider>(); // Опционально
-                // roadMC.sharedMesh = roadMesh;
+                MeshCollider roadMC = roadSegment.AddComponent<MeshCollider>(); // Опционально
+                roadMC.sharedMesh = roadMesh;
             }
 
             roadSegmentIndex++;

@@ -112,6 +112,33 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
+                },
+                {
+                    "name": "ToggleGearMode",
+                    "type": "Button",
+                    "id": "d15fff35-139d-4871-99e8-949846ae40bd",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "Gear Up",
+                    "type": "Button",
+                    "id": "50145bf1-f687-4c51-bb6e-1b053e94b132",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "Gear Down",
+                    "type": "Button",
+                    "id": "60acbf1c-3fcb-4eff-8242-26b1fc15451b",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -530,6 +557,39 @@
                     "processors": "",
                     "groups": ";Keyboard&Mouse",
                     "action": "ToggleDrivetrainMode",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "24ffd590-38aa-4314-9140-893d8fad57e0",
+                    "path": "<Keyboard>/g",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "ToggleGearMode",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "8d6f3273-774c-442e-8c76-843115f8cf5e",
+                    "path": "<Keyboard>/leftShift",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Gear Up",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "b25254a9-c61a-4430-b32e-d99a8c41cd3a",
+                    "path": "<Keyboard>/leftCtrl",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Gear Down",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

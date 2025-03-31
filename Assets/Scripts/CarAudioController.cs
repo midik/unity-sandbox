@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 [RequireComponent(typeof(Driveable))] // Звук зависит от управления
@@ -8,9 +9,9 @@ public class CarAudioController : MonoBehaviour
     public AudioSource rollingAudioSource; // <-- Добавили
 
     [Header("Engine Sound Settings")]
-    public float minPitch = 1f; // Минимальный Pitch на холостых
-    public float maxPitch = 5f; // Максимальный Pitch на высоких оборотах
-    public float pitchChangeSpeed = 10.0f; // Плавность изменения Pitch
+    public float minPitch = 0.5f; // Минимальный Pitch на холостых
+    public float maxPitch = 2.5f; // Максимальный Pitch на высоких оборотах
+    public float pitchChangeSpeed = 12.0f; // Плавность изменения Pitch
     
     // Опционально: модуляция громкости
     public float minVolume = 0.8f;
@@ -68,33 +69,25 @@ public class CarAudioController : MonoBehaviour
     {
         if (!engineAudioSource) return;
 
-        // --- Расчет целевого Pitch ---
-        float averageRPM = 0f;
-        foreach (var wheel in wheels)
-        {
-            averageRPM += Mathf.Abs(wheel.rpm);
-        }
-
-        averageRPM /= 4;
-
         // Нормализуем RPM
-        float targetPitchFactor = Mathf.InverseLerp(0f, driveable.maxRPM, averageRPM);
+        float targetPitchFactor = Mathf.InverseLerp(0f, driveable.engine.maxRPM, driveable.engine.CurrentRPM);
 
         // Целевой Pitch зависит от оборотов/скорости и немного от газа
         float targetPitch = Mathf.Lerp(minPitch, maxPitch, targetPitchFactor);
-        targetPitch += driveable.throttleNormalized * 0.1f; // Немного повышаем Pitch под газом
+        // targetPitch += driveable.throttleNormalized * 0.1f; // Немного повышаем Pitch под газом
         targetPitch = Mathf.Clamp(targetPitch, minPitch, maxPitch);
 
         // --- Расчет целевой Громкости ---
-        // Громкость зависит от газа и немного от оборотов/скорости
-        float targetVolume =
-            Mathf.Lerp(minVolume, maxVolume, driveable.throttleNormalized); // Основная зависимость от газа
-        // targetVolume += targetPitchFactor * 0.1f; // Чуть громче на высоких оборотах
-        targetVolume = Mathf.Clamp(targetVolume, minVolume, maxVolume);
+        // // Громкость зависит от газа и немного от оборотов/скорости
+        // float targetVolume =
+        //     Mathf.Lerp(minVolume, maxVolume, driveable.throttleNormalized); // Основная зависимость от газа
+        // // targetVolume += targetPitchFactor * 0.1f; // Чуть громче на высоких оборотах
+        // targetVolume = Mathf.Clamp(targetVolume, minVolume, maxVolume);
 
         // --- Плавное изменение Pitch и Volume ---
         currentPitch = Mathf.Lerp(currentPitch, targetPitch, Time.deltaTime * pitchChangeSpeed);
-        currentVolume = Mathf.Lerp(currentVolume, targetVolume, Time.deltaTime * volumeChangeSpeed);
+        // currentVolume = Mathf.Lerp(currentVolume, targetVolume, Time.deltaTime * volumeChangeSpeed);
+        currentVolume = maxVolume;
 
         engineAudioSource.pitch = currentPitch;
         engineAudioSource.volume = currentVolume;
@@ -121,13 +114,15 @@ public class CarAudioController : MonoBehaviour
         float targetRollingVolume = 0f;
         if (anyWheelGrounded)
         {
-            targetRollingVolume = Mathf.Lerp(rollingMinVolume, rollingMaxVolume, Mathf.InverseLerp(0f, driveable.maxSpeed, speed));
+            // targetRollingVolume = Mathf.Lerp(rollingMinVolume, rollingMaxVolume, Mathf.InverseLerp(0f, driveable.maxSpeed, speed));
+            targetRollingVolume = Mathf.Lerp(rollingMinVolume, rollingMaxVolume, Mathf.InverseLerp(0f, 60f, speed));
         }
 
         // Плавно меняем громкость (можно использовать одну общую скорость volumeChangeSpeed)
         rollingAudioSource.volume = Mathf.Lerp(rollingAudioSource.volume, targetRollingVolume, Time.deltaTime * volumeChangeSpeed);
 
         // Можно также немного менять Pitch качения от скорости
-        rollingAudioSource.pitch = Mathf.Lerp(0.8f, 1.2f, Mathf.InverseLerp(0f, driveable.maxSpeed, speed));
+        // rollingAudioSource.pitch = Mathf.Lerp(0.8f, 1.2f, Mathf.InverseLerp(0f, driveable.maxSpeed, speed));
+        rollingAudioSource.pitch = Mathf.Lerp(0.8f, 1.2f, Mathf.InverseLerp(0f, 60f, speed));
     }
 }
