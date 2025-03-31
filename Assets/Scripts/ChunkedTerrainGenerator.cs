@@ -1,7 +1,10 @@
 using UnityEngine;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using Unity.Collections;
+using Unity.Jobs;
 using Unity.Mathematics;
 using UnityEngine.Splines;
 
@@ -41,7 +44,7 @@ public class ChunkedTerrainGenerator : MonoBehaviour
     public float valleyNoiseOffsetX = 3000f; // Смещение шума долин X
     public float valleyNoiseOffsetZ = 4000f; // Смещение шума долин Z
 
-    [Header("Valleys (Spline Based)")]public bool useSplineValleys = true; // Включить/выключить сплайновые долины
+    [Header("Valleys (Spline Based)")] public bool useSplineValleys = true; // Включить/выключить сплайновые долины
     public SplineContainer splineContainer; // Сюда перетащить объект со сплайнами из сцены
     public float splineValleyWidth = 5f; // Ширина плоского дна долины
     public float splineValleyDepth = 6f; // Глубина долины в центре относительно окружающего рельефа
@@ -78,7 +81,6 @@ public class ChunkedTerrainGenerator : MonoBehaviour
     public static event Action OnChunksRegenerated;
     internal List<Spline> cachedSplines = null;
 
-
     // Метод для вызова из Context Menu в редакторе
     [ContextMenu("Terrain - Generate")]
     void GenerateContextMenu()
@@ -98,7 +100,6 @@ public class ChunkedTerrainGenerator : MonoBehaviour
         ClearChunks();
         Debug.Log("Cleared all terrain chunks.");
     }
-
 
     // Синхронная генерация с ProgressBar (для вызова из редактора)
     void GenerateChunks()
@@ -179,37 +180,38 @@ public class ChunkedTerrainGenerator : MonoBehaviour
 #endif
     }
 
-
     public void CacheSplines()
     {
         cachedSplines = new List<Spline>(); // Всегда создаем новый список
         if (!splineContainer)
         {
             if (useSplineValleys || useValleySplinesForRoads) // Проверяем оба флага
-                Debug.LogWarning($"CacheSplines: SplineContainer not assigned but required for valleys or roads. InstanceID={GetInstanceID()}");
+                Debug.LogWarning(
+                    $"CacheSplines: SplineContainer not assigned but required for valleys or roads. InstanceID={GetInstanceID()}");
             return;
         }
+
         if (!splineContainer.gameObject)
         {
             if (useSplineValleys || useValleySplinesForRoads)
-                Debug.LogError($"CacheSplines Error: SplineContainer GameObject is invalid! InstanceID={GetInstanceID()}");
+                Debug.LogError(
+                    $"CacheSplines Error: SplineContainer GameObject is invalid! InstanceID={GetInstanceID()}");
             return;
         }
+
         cachedSplines.AddRange(splineContainer.Splines);
     }
 
+    // Метод для запуска генерации чанка, теперь использует предварительные вычисления и burst-оптимизированные Jobs
     public GameObject GenerateSingleChunk(int chunkX, int chunkZ)
     {
-        // ... (Начало метода, создание объектов, сетки) ...
         GameObject chunk = new GameObject($"Chunk_{chunkX}_{chunkZ}");
         chunk.layer = LayerMask.NameToLayer("TerrainChunk");
         chunk.transform.position = new Vector3(chunkX * sizePerChunk, 0, chunkZ * sizePerChunk);
 
         MeshFilter mf = chunk.AddComponent<MeshFilter>();
-
         MeshRenderer mr = chunk.AddComponent<MeshRenderer>();
         mr.material = terrainMaterial;
-
         MeshCollider mc = chunk.AddComponent<MeshCollider>();
         mc.material = physicsMaterial;
 
@@ -228,79 +230,123 @@ public class ChunkedTerrainGenerator : MonoBehaviour
 
         Mesh mesh = new Mesh();
         mesh.name = $"TerrainMesh_{chunkX}_{chunkZ}";
-
         int vertsPerLine = resolutionPerChunk + 1;
+        int totalVertices = vertsPerLine * vertsPerLine;
 
-        Vector3[] vertices = new Vector3[vertsPerLine * vertsPerLine];
-        Vector2[] uvs = new Vector2[vertsPerLine * vertsPerLine];
+        // Подготовка данных для Job
+        NativeArray<float> heights = new NativeArray<float>(totalVertices, Allocator.TempJob);
 
-        int[] triangles = new int[resolutionPerChunk * resolutionPerChunk * 6];
-        float step = sizePerChunk / resolutionPerChunk;
-        float actualSplineValleyFalloff = Mathf.Max(0.01f, splineValleyFalloff);
-        float halfSplineWidth = splineValleyWidth / 2f;
-        float fullInfluenceRadius = halfSplineWidth + actualSplineValleyFalloff;
-        float fullInfluenceRadiusSq = fullInfluenceRadius * fullInfluenceRadius;
-        
-        for (int z = 0; z < vertsPerLine; z++)
+        // Предвычисление кривой высот
+        int curveSamples = 256;
+        NativeArray<float> heightCurveValues = new NativeArray<float>(curveSamples, Allocator.TempJob);
+        for (int i = 0; i < curveSamples; i++)
         {
-            for (int x = 0; x < vertsPerLine; x++)
+            float t = (float)i / (curveSamples - 1);
+            heightCurveValues[i] = heightCurve.Evaluate(t);
+        }
+
+        // Предвычисление влияния сплайнов
+        NativeArray<float> splineFactors = new NativeArray<float>(totalVertices, Allocator.TempJob);
+        float step = sizePerChunk / resolutionPerChunk;
+        if (useSplineValleys && cachedSplines != null && cachedSplines.Count > 0)
+        {
+            for (int z = 0; z < vertsPerLine; z++)
             {
-                float localX = x * step;
-                float localZ = z * step;
-                float worldX = chunk.transform.position.x + localX;
-                float worldZ = chunk.transform.position.z + localZ;
-                float3 worldPos = new float3(worldX, 0, worldZ);
-
-                float baseHeight = GetTerrainHeight(worldX, worldZ);
-                float finalHeight = baseHeight;
-
-
-                // --- Применяем сплайновые долины ---
-                if (useSplineValleys && cachedSplines != null && cachedSplines.Count > 0)
+                for (int x = 0; x < vertsPerLine; x++)
                 {
-                    float minDistanceToSplineSq = float.MaxValue;
+                    float localX = x * step;
+                    float localZ = z * step;
+                    float worldX = chunk.transform.position.x + localX;
+                    float worldZ = chunk.transform.position.z + localZ;
+                    float3 worldPos = new float3(worldX, 0, worldZ);
+
+                    float minDistSq = float.MaxValue;
                     foreach (var spline in cachedSplines)
                     {
                         if (spline == null || spline.Knots == null || spline.Knots.Count() < 2) continue;
                         SplineUtility.GetNearestPoint(spline, worldPos, out float3 nearestPoint, out _, 3, 8);
-                        float distSq = math.distancesq(new float2(worldPos.x, worldPos.z),
-                            new float2(nearestPoint.x, nearestPoint.z));
-                        minDistanceToSplineSq = math.min(minDistanceToSplineSq, distSq);
+                        float distSq = math.distancesq(new float2(worldPos.x, worldPos.z), new float2(nearestPoint.x, nearestPoint.z));
+                        minDistSq = math.min(minDistSq, distSq);
                     }
-                    
-                    if (minDistanceToSplineSq < fullInfluenceRadiusSq)
+
+                    float minDistanceToSpline = math.sqrt(minDistSq);
+                    float splineFactor = 0f;
+                    float halfWidth = splineValleyWidth / 2f;
+                    if (minDistanceToSpline <= halfWidth)
                     {
-                        float minDistanceToSpline = math.sqrt(minDistanceToSplineSq);
-                        float splineFactor = 0f;
-
-                        if (minDistanceToSpline <= halfSplineWidth) // Дно
-                        {
-                            splineFactor = 1.0f;
-                        }
-                        else // Склон
-                        {
-                            // Нормализуем позицию на склоне от 0 до 1
-                            float t = (minDistanceToSpline - halfSplineWidth) / actualSplineValleyFalloff;
-                            splineFactor = valleySlopeCurve.Evaluate(t);
-                        }
-
-                        splineFactor = math.clamp(splineFactor, 0f, 1f); // Убедимся, что фактор в [0,1]
-
-                        float heightReduction = splineFactor * splineValleyDepth;
-                        finalHeight = baseHeight - heightReduction;
+                        splineFactor = 1.0f;
                     }
+                    else if (minDistanceToSpline < halfWidth + splineValleyFalloff)
+                    {
+                        float t = (minDistanceToSpline - halfWidth) / splineValleyFalloff;
+                        float smoothT = t * t * (3f - 2f * t); // Smoothstep
+                        splineFactor = 1f - smoothT;
+                    }
+
+                    int index = x + z * vertsPerLine;
+                    splineFactors[index] = splineFactor;
                 }
-                // --- Конец сплайновых долин ---
-
-                finalHeight = Mathf.Max(0, finalHeight);
-
-                int index = x + z * vertsPerLine;
-                vertices[index] = new Vector3(localX, finalHeight, localZ);
-                uvs[index] = new Vector2((float)x / resolutionPerChunk, (float)z / resolutionPerChunk);
+            }
+        }
+        else
+        {
+            for (int i = 0; i < totalVertices; i++)
+            {
+                splineFactors[i] = 0f;
             }
         }
 
-        // ... (Заполнение triangles, назначение mesh, RecalculateNormals) ...
+        // Настройка и запуск Burst-оптимизированного Job
+        TerrainHeightJob job = new TerrainHeightJob
+        {
+            vertsPerLine = vertsPerLine,
+            step = step,
+            chunkWorldX = chunk.transform.position.x,
+            chunkWorldZ = chunk.transform.position.z,
+            maxHeight = maxHeight,
+            terrainScale = terrainScale,
+            octaves = octaves,
+            persistence = persistence,
+            lacunarity = lacunarity,
+            noiseOffsetX = noiseOffsetX,
+            noiseOffsetZ = noiseOffsetZ,
+            useDomainWarping = useDomainWarping,
+            domainWarpScale = domainWarpScale,
+            domainWarpStrength = domainWarpStrength,
+            domainWarpOffsetX = domainWarpOffsetX,
+            domainWarpOffsetZ = domainWarpOffsetZ,
+            heightCurveValues = heightCurveValues,
+            heightCurveSamples = curveSamples,
+            useValleys = useValleys,
+            valleyNoiseScale = valleyNoiseScale,
+            valleyDepth = valleyDepth,
+            valleyWidthFactor = valleyWidthFactor,
+            valleyNoiseOffsetX = valleyNoiseOffsetX,
+            valleyNoiseOffsetZ = valleyNoiseOffsetZ,
+            useSplineValleys = useSplineValleys,
+            splineFactors = splineFactors,
+            splineValleyDepth = splineValleyDepth,
+            heights = heights
+        };
+
+        JobHandle handle = job.Schedule(totalVertices, 64);
+        handle.Complete(); // В синхронном методе ожидаем завершения
+
+        // Создание вершин
+        Vector3[] vertices = new Vector3[totalVertices];
+        Vector2[] uvs = new Vector2[totalVertices];
+        for (int i = 0; i < totalVertices; i++)
+        {
+            int x = i % vertsPerLine;
+            int z = i / vertsPerLine;
+            float localX = x * step;
+            float localZ = z * step;
+            vertices[i] = new Vector3(localX, heights[i], localZ);
+            uvs[i] = new Vector2((float)x / resolutionPerChunk, (float)z / resolutionPerChunk);
+        }
+
+        // Создание треугольников
+        int[] triangles = new int[resolutionPerChunk * resolutionPerChunk * 6];
         int tri = 0;
         for (int z = 0; z < resolutionPerChunk; z++)
         {
@@ -318,6 +364,7 @@ public class ChunkedTerrainGenerator : MonoBehaviour
             }
         }
 
+        // Настройка меша
         mesh.vertices = vertices;
         mesh.uv = uvs;
         mesh.triangles = triangles;
@@ -326,76 +373,12 @@ public class ChunkedTerrainGenerator : MonoBehaviour
         mf.mesh = mesh;
         mc.sharedMesh = mesh;
 
+        // Освобождение памяти
+        heights.Dispose();
+        heightCurveValues.Dispose();
+        splineFactors.Dispose();
+
         return chunk;
-    }
-
-    // Функция расчета высоты БЕЗ сплайновых долин
-    float GetTerrainHeight(float worldX, float worldZ)
-    {
-        // Шаг 1: Domain Warping
-        float warpedX = worldX;
-        float warpedZ = worldZ;
-        if (useDomainWarping)
-        {
-            // Используем 4 вызова для более сложного варпинга (можно упростить до 2)
-            float warpNoiseX_1 =
-                Mathf.PerlinNoise((worldX / domainWarpScale) + domainWarpOffsetX, (worldZ / domainWarpScale));
-            float warpNoiseX_2 = Mathf.PerlinNoise((worldX / domainWarpScale),
-                (worldZ / domainWarpScale) + domainWarpOffsetX + 100f); // Смещение для второго
-            float warpNoiseZ_1 =
-                Mathf.PerlinNoise((worldX / domainWarpScale) + domainWarpOffsetZ, (worldZ / domainWarpScale));
-            float warpNoiseZ_2 = Mathf.PerlinNoise((worldX / domainWarpScale),
-                (worldZ / domainWarpScale) + domainWarpOffsetZ + 100f); // Смещение для второго
-
-            float warpOffsetX =
-                ((warpNoiseX_1 + warpNoiseX_2) * 0.5f * 2f - 1f) * domainWarpStrength; // Среднее от двух шумов
-            float warpOffsetZ =
-                ((warpNoiseZ_1 + warpNoiseZ_2) * 0.5f * 2f - 1f) * domainWarpStrength; // Среднее от двух шумов
-
-            warpedX += warpOffsetX;
-            warpedZ += warpOffsetZ;
-        }
-
-        // Шаг 2: Базовый фрактальный шум
-        float totalHeight = 0;
-        float frequency = 1.0f;
-        float amplitude = 1.0f;
-        float maxValue = 0; // Для нормализации
-        for (int i = 0; i < octaves; i++)
-        {
-            float sampleX = (warpedX / terrainScale * frequency) + noiseOffsetX;
-            float sampleZ = (warpedZ / terrainScale * frequency) + noiseOffsetZ;
-            // Добавим небольшое смещение для каждой октавы, чтобы избежать артефактов
-            sampleX += i * 0.1f;
-            sampleZ += i * 0.1f;
-            float perlinValue = Mathf.PerlinNoise(sampleX, sampleZ);
-            totalHeight += perlinValue * amplitude;
-            maxValue += amplitude;
-            amplitude *= persistence;
-            frequency *= lacunarity;
-        }
-
-        float normalizedHeight = (maxValue > 0) ? (totalHeight / maxValue) : 0; // Защита от деления на ноль
-
-        // Шаг 3: Применение кривой высот
-        float curvedHeight = heightCurve.Evaluate(normalizedHeight);
-        float baseTerrainHeight = curvedHeight * maxHeight;
-
-        // Шаг 4: Формирование долин (Noise Based)
-        float heightAfterNoiseValleys = baseTerrainHeight;
-        if (useValleys)
-        {
-            float valleyNoiseX = (warpedX / valleyNoiseScale) + valleyNoiseOffsetX; // Используем warped координаты
-            float valleyNoiseZ = (warpedZ / valleyNoiseScale) + valleyNoiseOffsetZ;
-            float rawValleyNoise = Mathf.PerlinNoise(valleyNoiseX, valleyNoiseZ);
-            float ridgeNoise = 1.0f - Mathf.Abs(rawValleyNoise * 2f - 1f);
-            float valleyFactor = Mathf.Pow(ridgeNoise, valleyWidthFactor);
-            float heightReduction = valleyFactor * valleyDepth;
-            heightAfterNoiseValleys = baseTerrainHeight - heightReduction;
-            // Не ограничиваем здесь, ограничение будет после сплайновых долин
-        }
-
-        return heightAfterNoiseValleys;
     }
 
     // Метод очистки чанков

@@ -4184,7 +4184,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   playerTransform: {fileID: 1739615153}
-  loadRadius: 3
+  loadRadius: 6
   checkInterval: 0.5
 --- !u!114 &815975679
 MonoBehaviour:
@@ -9330,7 +9330,7 @@ Transform:
   m_GameObject: {fileID: 1739615152}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 42, y: 1.88, z: 42}
+  m_LocalPosition: {x: 48, y: 10, z: 48}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
