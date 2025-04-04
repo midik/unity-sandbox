@@ -35,8 +35,6 @@ public abstract class Driveable : Respawnable
     [Header("Clutch Settings")]
     [Tooltip("Кривая включения сцепления. X=Обороты выше холостых (норм. 0..1), Y=Фактор сцепления (0..1)")]
     public AnimationCurve clutchEngagementCurve = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f); // Плавный старт по умолчанию
-    [Tooltip("Фактор сцепления, ниже которого сцепление начинает проскальзывать (0..1)")]
-    public float clutchSlippingFactor = 0.95f; 
 
     [Tooltip("Диапазон оборотов (выше холостых), на котором происходит включение сцепления от 0 до 1")]
     public float clutchEngageRPMRange = 600f; // Например, сцепление полностью включится при idleRPM + 500 RPM
@@ -173,36 +171,24 @@ public abstract class Driveable : Respawnable
         {
             wasShifted = gearbox.UpdateGear(engine.CurrentRPM, throttleInput, currentSpeedKmh, moveY, Time.fixedDeltaTime);
         }
-
-        // --- Обновляем двигатель ---
-        // Определяем, должны ли обороты двигателя СЛЕДОВАТЬ за колесами.
-        // Условие: на передаче, сцепление ХОТЯ БЫ ЧАСТИЧНО включено (factor > ~0),
-        // и мы НЕ только что переключились (даем оборотам "устаканиться")
-        bool isDrivetrainConnected =
-            gearbox.IsInGear
-            && clutchFactor > clutchSlippingFactor
-            && (!wasShifted || !gearbox.IsAutomatic);
         
-        if (isDrivetrainConnected)
+        // Рассчитываем целевые обороты двигателя от колес
+        float totalDriveRatio = gearbox.CurrentGearRatio * gearbox.finalDriveRatio;
+        float targetEngineRPMFromWheels = 0f;
+        if (Mathf.Abs(totalDriveRatio) > 0.01f)
         {
-            // Сцепление частично включено -> двигатель частично синхронизируется с колесами, учитывая проскальзывание
-            float totalDriveRatio = gearbox.CurrentGearRatio * gearbox.finalDriveRatio;
-            float targetEngineRPMFromWheels = 0f;
-            if (Mathf.Abs(totalDriveRatio) > 0.01f)
-            {
-                targetEngineRPMFromWheels = drivenWheelRPM * Mathf.Abs(totalDriveRatio);
-            }
-
-            // Смешиваем текущие обороты двигателя с целевыми оборотами от колес по фактору сцепления
-            float blendedRPM = Mathf.Lerp(engine.CurrentRPM, targetEngineRPMFromWheels, clutchFactor);
-            engine.SetRPM(blendedRPM);
+            targetEngineRPMFromWheels = drivenWheelRPM * Mathf.Abs(totalDriveRatio);
         }
 
         // Вызываем основной метод обновления движка.
-        // Он обновит CurrentRPM движка, ТОЛЬКО ЕСЛИ !shouldSyncRPM (т.е. сцепление выключено или только что переключились).
-        // Он ВСЕГДА вернет потенциальный момент (положительный минус сопротивление) на ТЕКУЩИХ оборотах движка.
-        // Передаем !isDrivetrainConnected как флаг "свободного вращения"
-        currentEngineTorque = engine.UpdateAndCalculateTorque(throttleInput, isDrivetrainConnected, Time.fixedDeltaTime);
+        // Он вернет потенциальный момент (положительный минус сопротивление) на ТЕКУЩИХ оборотах движка.
+        currentEngineTorque = engine.UpdateAndCalculateTorque(
+            throttleInput,
+            Time.fixedDeltaTime,
+            clutchFactor,
+            targetEngineRPMFromWheels
+        );
+        
         engineRPM = engine.CurrentRPM; // Обновляем для отображения
 
         // --- Расчет момента на колесах ---
@@ -358,6 +344,7 @@ public abstract class Driveable : Respawnable
         else
         {
             engine.StartEngine();
+            clutchFactor = 0f;
         }
     }
 }

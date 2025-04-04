@@ -42,7 +42,7 @@ public class Engine
     // Обновляет состояние двигателя и возвращает МОМЕНТ, который двигатель МОЖЕТ выдать на ТЕКУЩИХ оборотах.
     // Если трансмиссия разомкнута, CurrentRPM устанавливается ИЗВНЕ через SetRPMFromLoad().
     // В этом методе мы его не трогаем в таком случае.
-    public float UpdateAndCalculateTorque(float throttleInput, bool isDrivetrainConnected, float deltaTime)
+    public float UpdateAndCalculateTorque(float throttleInput, float deltaTime, float clutchFactor, float externalRPM)
     {
         if (!isRunning)
         {
@@ -55,42 +55,35 @@ public class Engine
         }
         
         throttleInput = Mathf.Clamp01(throttleInput);
+        
 
         // --- ЛОГИКА ОБНОВЛЕНИЯ RPM ---
 
-        // Трансмиссия разомкнута: двигатель вращается свободно
-        if (!isDrivetrainConnected)
+        // Рассчитываем потенциальный момент от нажатия газа на текущих оборотах
+        float potentialTorque = torqueCurve.Evaluate(CurrentRPM) * throttleInput;
+
+        // Рассчитываем момент сопротивления (трение + стремление к холостым)
+        // Трение пропорционально оборотам и инерции (для масштаба)
+        float frictionResistance = CurrentRPM * inertia * internalFrictionFactor;
+
+        float idleCorrectionTorque = 0f;
+        // Если газ не нажат, добавляем "силу", тянущую к idleRPM
+        if (throttleInput < 0.01f)
         {
-            // Рассчитываем потенциальный момент от нажатия газа на текущих оборотах
-            float potentialTorque = torqueCurve.Evaluate(CurrentRPM) * throttleInput;
-
-            // Рассчитываем момент сопротивления (трение + стремление к холостым)
-            // Трение пропорционально оборотам и инерции (для масштаба)
-            float frictionResistance = CurrentRPM * inertia * internalFrictionFactor;
-
-            float idleCorrectionTorque = 0f;
-            // Если газ не нажат, добавляем "силу", тянущую к idleRPM
-            if (throttleInput < 0.01f)
-            {
-                // Сила пропорциональна отклонению от холостых.
-                idleCorrectionTorque = (idleRPM - CurrentRPM) * inertia;
-            }
-
-            // Чистый момент = (момент от газа + коррекция к холостым) - трение
-            float netTorque = potentialTorque + idleCorrectionTorque - frictionResistance;
-
-            // Изменяем RPM на основе чистого момента и инерции
-            CurrentRPM += (netTorque / inertia) * deltaTime;
-
-            CurrentRPM = Mathf.Clamp(CurrentRPM, idleRPM * 0.5f, maxRPM);
-                
-            // Дополнительно плавно подтягиваем к idleRPM, если обороты ниже и газ отпущен
-            if (CurrentRPM < idleRPM && throttleInput < 0.01f)
-            {
-                // Множитель в Lerp (здесь 1.5f) определяет скорость подтягивания (настроить)
-                CurrentRPM = Mathf.Lerp(CurrentRPM, idleRPM, deltaTime * 1.5f);
-            }
+            // Сила пропорциональна отклонению от холостых.
+            idleCorrectionTorque = (idleRPM - CurrentRPM) * inertia;
         }
+
+        // Чистый момент = (момент от газа + коррекция к холостым) - трение
+        float netTorque = potentialTorque + idleCorrectionTorque - frictionResistance;
+
+        // Изменяем RPM на основе чистого момента и инерции
+        CurrentRPM += (netTorque / inertia) * deltaTime;
+
+        CurrentRPM = Mathf.Clamp(CurrentRPM, idleRPM * 0.5f, maxRPM);
+            
+        // Подтягиваем с целевыми оборотами от колес по фактору сцепления
+        CurrentRPM = Mathf.Lerp(CurrentRPM, externalRPM, clutchFactor);
         
         // Если обороты упали слишком низко, двигатель глохнет
         if (CurrentRPM <= stallRPM)
