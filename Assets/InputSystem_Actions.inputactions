@@ -139,6 +139,15 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
+                },
+                {
+                    "name": "StartEngine",
+                    "type": "Button",
+                    "id": "65b88148-c13a-435a-9951-088e84805449",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -590,6 +599,17 @@
                     "processors": "",
                     "groups": "",
                     "action": "Gear Down",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "957a3fb7-3b2a-41e8-9ff7-88ee91ebb1ef",
+                    "path": "<Keyboard>/e",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "StartEngine",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

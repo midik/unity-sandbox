@@ -35,6 +35,7 @@ public class CarController : Driveable // Убедись, что наследу�
         inputActions.Player.ToggleGearMode.performed += ctx => ToggleGearboxMode();
         inputActions.Player.GearUp.performed += ctx => gearbox.GearUp();
         inputActions.Player.GearDown.performed += ctx => gearbox.GearDown();
+        inputActions.Player.StartEngine.performed += ctx => StartStopEngine();
 
         // Find components
         aliveDetector = GetComponent<AliveDetector>();
@@ -43,10 +44,8 @@ public class CarController : Driveable // Убедись, что наследу�
     // Start is called after Awake
     protected override void Start()
     {
-        // Call Driveable's Start (which initializes Engine, Gearbox etc.)
         base.Start();
-
-        if(respawnText) respawnText.gameObject.SetActive(false); // Добавим проверку на null
+        if (respawnText) respawnText.gameObject.SetActive(false); // Добавим проверку на null
     }
 
 
@@ -80,10 +79,10 @@ public class CarController : Driveable // Убедись, что наследу�
             // Передаем moveY = -1, чтобы показать намерение тормозить/ехать назад
             UpdatePowertrain(0f, 1f, 0f, -1f); // Zero throttle, full brake, zero steer, moveY=-1
             // Update text for dead state
-            if(speedText) speedText.text = "O_o";
-            if(rpmText) rpmText.text = "---";
-            if(gearText) gearText.text = "X";
-            if(respawnText) respawnText.gameObject.SetActive(true);
+            if (speedText) speedText.text = "O_o";
+            if (rpmText) rpmText.text = "---";
+            if (gearText) gearText.text = "X";
+            if (respawnText) respawnText.gameObject.SetActive(true);
             return;
         }
 

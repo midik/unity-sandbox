@@ -28,14 +28,15 @@ public abstract class Driveable : Respawnable
 {
     [Header("Handling")] public float steerAngle = 30f;
 
-    [Header("Powertrain Components")] public Engine engine; // Assign or configure Engine settings here
+    [Header("Powertrain Components")]
+    public Engine engine; // Assign or configure Engine settings here
     public Gearbox gearbox; // Assign or configure Gearbox settings here
 
     [Header("Clutch Settings")]
     [Tooltip("Кривая включения сцепления. X=Обороты выше холостых (норм. 0..1), Y=Фактор сцепления (0..1)")]
     public AnimationCurve clutchEngagementCurve = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f); // Плавный старт по умолчанию
-    [FormerlySerializedAs("clutchBackpressureFactor")] [Tooltip("Фактор сцепления, ниже которого сцепление начинает проскальзывать (0..1)")]
-    public float clutchSlippingFactor = 0.50f; 
+    [Tooltip("Фактор сцепления, ниже которого сцепление начинает проскальзывать (0..1)")]
+    public float clutchSlippingFactor = 0.95f; 
 
     [Tooltip("Диапазон оборотов (выше холостых), на котором происходит включение сцепления от 0 до 1")]
     public float clutchEngageRPMRange = 600f; // Например, сцепление полностью включится при idleRPM + 500 RPM
@@ -80,7 +81,7 @@ public abstract class Driveable : Respawnable
 
     protected override void Start()
     {
-        base.Start(); // Calls Respawnable's Start (which gets Rigidbody and sets spawn pos/rot)
+        base.Start();
 
         engine.Initialize();
         gearbox.Initialize();
@@ -142,9 +143,14 @@ public abstract class Driveable : Respawnable
         bool tryingToEngage = throttleInput > 0.01f || engine.CurrentRPM > engine.idleRPM;
 
         // Рассчитываем фактор сцепления
-        // Полностью выключаем только если обороты на холостых ИЛИ НИЖЕ, И газ НЕ нажат
-        if (!tryingToEngage && engine.CurrentRPM <= engine.idleRPM)
+        if (gearbox.CurrentGearIndex != 0 && gearbox.CurrentGearIndex != 2)
         {
+            // Бросаем сцепление на всех передачах кроме задней и первой
+            clutchFactor = 1.0f;
+        }
+        else if (!tryingToEngage && engine.CurrentRPM <= engine.idleRPM)
+        {
+            // Полностью выключаем только если обороты на холостых ИЛИ НИЖЕ, И газ НЕ нажат
             clutchFactor = 0.0f;
         }
         else
@@ -164,15 +170,18 @@ public abstract class Driveable : Respawnable
         // --- Обновляем коробку передач, если автомат ---
         if (gearbox.IsAutomatic)
         {
-            wasShifted = gearbox.UpdateGear(engine.CurrentRPM, throttleInput, currentSpeedKmh, moveY,
-                Time.fixedDeltaTime);
+            wasShifted = gearbox.UpdateGear(engine.CurrentRPM, throttleInput, currentSpeedKmh, moveY, Time.fixedDeltaTime);
         }
 
         // --- Обновляем двигатель ---
         // Определяем, должны ли обороты двигателя СЛЕДОВАТЬ за колесами.
         // Условие: Водитель пытается ехать, мы на передаче, сцепление ХОТЯ БЫ ЧАСТИЧНО включено (factor > ~0),
         // и мы НЕ только что переключились (даем оборотам "устаканиться")
-        bool isDrivetrainConnected = gearbox.IsInGear && clutchFactor > clutchSlippingFactor && !wasShifted;
+        bool isDrivetrainConnected =
+            gearbox.IsInGear
+            && clutchFactor > clutchSlippingFactor
+            && (!wasShifted || !gearbox.IsAutomatic);
+        
         if (isDrivetrainConnected)
         {
             // Сцепление частично включено -> двигатель частично синхронизируется с колесами, учитывая проскальзывание
@@ -184,7 +193,7 @@ public abstract class Driveable : Respawnable
             }
 
             // Смешиваем текущие обороты двигателя с целевыми оборотами от колес по фактору сцепления
-            float blendedRPM = Mathf.Lerp(engine.CurrentRPM, targetEngineRPMFromWheels, 1 - clutchFactor);
+            float blendedRPM = Mathf.Lerp(engine.CurrentRPM, targetEngineRPMFromWheels, clutchFactor);
             engine.SetRPMFromLoad(blendedRPM);
         }
 
@@ -341,5 +350,19 @@ public abstract class Driveable : Respawnable
         }
 
         gearbox?.ToggleGearboxMode();
+    }
+
+    internal void StartStopEngine()
+    {
+        if (engine.isRunning)
+        {
+            engine.StopEngine();
+            Debug.Log("Engine stopped.");
+        }
+        else
+        {
+            engine.StartEngine();
+            Debug.Log("Engine started.");
+        }
     }
 }

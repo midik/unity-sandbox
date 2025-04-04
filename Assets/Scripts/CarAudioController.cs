@@ -69,6 +69,8 @@ public class CarAudioController : MonoBehaviour
     {
         if (!engineAudioSource) return;
 
+        engineAudioSource.mute = !driveable.engine.isRunning;
+
         // Нормализуем RPM
         float targetPitchFactor = Mathf.InverseLerp(0f, driveable.engine.maxRPM, driveable.engine.CurrentRPM);
 
