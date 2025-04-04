@@ -1,3 +1,4 @@
+using JetBrains.Annotations;
 using UnityEngine;
 
 [System.Serializable] // To allow editing in Inspector when nested in Driveable
@@ -43,6 +44,16 @@ public class Engine
     // В этом методе мы его не трогаем в таком случае.
     public float UpdateAndCalculateTorque(float throttleInput, bool isDrivetrainConnected, float deltaTime)
     {
+        if (!isRunning)
+        {
+            // Если двигатель не запущен, возвращаем 0 момент
+            generatedTorque = 0f;
+            potentialPositiveTorque = 0f;
+            engineResistanceTorque = 0f;
+            lastNetTorque = 0f;
+            return 0f;
+        }
+        
         throttleInput = Mathf.Clamp01(throttleInput);
 
         // --- ЛОГИКА ОБНОВЛЕНИЯ RPM ---
@@ -81,12 +92,11 @@ public class Engine
             }
         }
         
-        // Если обороты упали ниже холостых, останавливаем двигатель
+        // Если обороты упали слишком низко, двигатель глохнет
         if (CurrentRPM <= stallRPM)
         {
-            CurrentRPM = 0f;
-            isRunning = false;
-            return 0f; // Двигатель заглох
+            StallEngine($"Free RPM = {CurrentRPM}");
+            return 0f;
         }
             
         // Если обороты превышают максимум, ограничиваем их
@@ -109,21 +119,16 @@ public class Engine
     }
 
     // Метод для ВНЕШНЕЙ установки RPM (когда сцепление включено)
-    public void SetRPMFromLoad(float loadCalculatedRPM)
-    {
-        // Просто устанавливаем RPM, полученный от колес, ограничивая его снизу нулем и сверху максимумом
-        CurrentRPM = Mathf.Clamp(loadCalculatedRPM, 0, maxRPM);
-    }
-
-    // Public getter for the torque generated this frame (остался из прошлой версии, может быть полезен)
-    public float GetGeneratedTorque()
-    {
-        return generatedTorque;
-    }
-
-    // Force set RPM (e.g., for initialization or stalling)
     public void SetRPM(float rpm)
     {
+        // Если обороты упали слишком низко, двигатель глохнет
+        if (CurrentRPM <= stallRPM)
+        {
+            StallEngine($"Load RPM = {CurrentRPM}");
+            return;
+        }
+
+        // Просто устанавливаем RPM, полученный от колес, ограничивая его снизу нулем и сверху максимумом
         CurrentRPM = Mathf.Clamp(rpm, 0, maxRPM);
     }
 
@@ -131,6 +136,7 @@ public class Engine
     {
         isRunning = true;
         CurrentRPM = idleRPM;
+        Debug.Log("Engine started.");
     }
 
     public void StopEngine()
@@ -138,5 +144,16 @@ public class Engine
         isRunning = false;
         CurrentRPM = 0f;
         generatedTorque = 0f;
+        potentialPositiveTorque = 0f;
+        Debug.Log("Engine stopped.");
+    }
+    
+    public void StallEngine(string reason = "")
+    {
+        isRunning = false;
+        CurrentRPM = 0f;
+        generatedTorque = 0f;
+        potentialPositiveTorque = 0f;
+        Debug.Log($"Engine stalled! ({reason})");
     }
 }

@@ -72,22 +72,16 @@ public class CarController : Driveable // Убедись, что наследу�
     void FixedUpdate()
     {
         // Handle Dead State
-        if (aliveDetector && aliveDetector.isDead) // Убедимся, что aliveDetector не null
+        if (aliveDetector && aliveDetector.isDead)
         {
-            // Stop the car completely when dead
-            // Call UpdatePowertrain with zero inputs and max brakes?
-            // Передаем moveY = -1, чтобы показать намерение тормозить/ехать назад
-            UpdatePowertrain(0f, 1f, 0f, -1f); // Zero throttle, full brake, zero steer, moveY=-1
-            // Update text for dead state
+            engine.StallEngine("dead");
             if (speedText) speedText.text = "O_o";
-            if (rpmText) rpmText.text = "---";
+            if (rpmText) rpmText.text = "X";
             if (gearText) gearText.text = "X";
             if (respawnText) respawnText.gameObject.SetActive(true);
             return;
         }
 
-        // --- Call Driveable's UpdatePowertrain with processed inputs ---
-        // Передаем исходный moveInput.y для логики включения задней передачи в Gearbox
         UpdatePowertrain(throttleInput, brakeInput, steeringInput, moveInput.y);
     }
 
@@ -109,15 +103,12 @@ public class CarController : Driveable // Убедись, что наследу�
         UpdateHud(); // Update HUD to show initial state
     }
 
-    // Update HUD elements
     void UpdateHud()
     {
-        // Only update if Driveable is initialized and we are not dead
-        // Добавим проверку на null для aliveDetector
-        if (engine == null || gearbox == null || (aliveDetector && aliveDetector.isDead)) return;
+        if (engine == null || gearbox == null || aliveDetector.isDead) return;
 
         // Update Speed Text (using the value calculated in Driveable)
-        if (speedText) speedText.text = currentSpeedKmh.ToString("F1"); // Display Km/h
+        if (speedText) speedText.text = currentSpeedKmh.ToString("F0");
 
         // Update Drivetrain Text
         if (drivetrainText) drivetrainText.text = drivetrainMode.ToString();
@@ -132,9 +123,11 @@ public class CarController : Driveable // Убедись, что наследу�
         {
             int gear = GetCurrentGear(); // Use getter from Driveable
             string gearStr;
+            
             if (gear == 0) gearStr = "R"; // Индекс 0 = R
             else if (gear == 1) gearStr = "N"; // Индекс 1 = N
             else gearStr = (gear - 1).ToString(); // Индекс 2 = 1-я, 3 = 2-я и т.д.
+            
             gearText.text = gearStr;
         }
 

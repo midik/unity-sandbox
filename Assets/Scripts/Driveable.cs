@@ -130,6 +130,8 @@ public abstract class Driveable : Respawnable
         throttleInput = Mathf.Clamp01(throttle);
         brakeInput = Mathf.Clamp01(brake);
         steeringInput = Mathf.Clamp(steering, -1f, 1f);
+        
+        if (!engine.isRunning) {}
 
         // Добавим проверку на rb, если он вдруг не найден
         currentSpeedKmh = rb ? rb.linearVelocity.magnitude * 3.6f : 0f;
@@ -140,7 +142,7 @@ public abstract class Driveable : Respawnable
         bool wasShifted = false; // Флаг для отслеживания переключения
 
         // Определяем, пытается ли водитель ехать (газ нажат ИЛИ обороты выше холостых)
-        bool tryingToEngage = throttleInput > 0.01f || engine.CurrentRPM > engine.idleRPM;
+        // bool tryingToEngage = throttleInput > 0.01f || engine.CurrentRPM > engine.idleRPM;
 
         // Рассчитываем фактор сцепления
         if (gearbox.CurrentGearIndex != 0 && gearbox.CurrentGearIndex != 2)
@@ -148,11 +150,11 @@ public abstract class Driveable : Respawnable
             // Бросаем сцепление на всех передачах кроме задней и первой
             clutchFactor = 1.0f;
         }
-        else if (!tryingToEngage && engine.CurrentRPM <= engine.idleRPM)
-        {
-            // Полностью выключаем только если обороты на холостых ИЛИ НИЖЕ, И газ НЕ нажат
-            clutchFactor = 0.0f;
-        }
+        // else if (!tryingToEngage && engine.CurrentRPM <= engine.idleRPM)
+        // {
+        //     // Полностью выключаем только если обороты на холостых ИЛИ НИЖЕ, И газ НЕ нажат
+        //     clutchFactor = 0.0f;
+        // }
         else
         {
             // Рассчитываем обороты относительно начала включения (idleRPM)
@@ -166,7 +168,6 @@ public abstract class Driveable : Respawnable
         // Гарантируем, что фактор всегда в пределах [0, 1]
         clutchFactor = Mathf.Clamp01(clutchFactor);
 
-
         // --- Обновляем коробку передач, если автомат ---
         if (gearbox.IsAutomatic)
         {
@@ -175,7 +176,7 @@ public abstract class Driveable : Respawnable
 
         // --- Обновляем двигатель ---
         // Определяем, должны ли обороты двигателя СЛЕДОВАТЬ за колесами.
-        // Условие: Водитель пытается ехать, мы на передаче, сцепление ХОТЯ БЫ ЧАСТИЧНО включено (factor > ~0),
+        // Условие: на передаче, сцепление ХОТЯ БЫ ЧАСТИЧНО включено (factor > ~0),
         // и мы НЕ только что переключились (даем оборотам "устаканиться")
         bool isDrivetrainConnected =
             gearbox.IsInGear
@@ -194,7 +195,7 @@ public abstract class Driveable : Respawnable
 
             // Смешиваем текущие обороты двигателя с целевыми оборотами от колес по фактору сцепления
             float blendedRPM = Mathf.Lerp(engine.CurrentRPM, targetEngineRPMFromWheels, clutchFactor);
-            engine.SetRPMFromLoad(blendedRPM);
+            engine.SetRPM(blendedRPM);
         }
 
         // Вызываем основной метод обновления движка.
@@ -206,28 +207,36 @@ public abstract class Driveable : Respawnable
 
         // --- Расчет момента на колесах ---
         float driveTorque = 0;
-        // Передаем момент, если мы на передаче, умножая на ПЛАВНЫЙ clutchFactor
         if (gearbox.IsInGear)
         {
-            // Используем ПОСЛЕДНИЙ рассчитанный чистый момент от движка и текущий clutchFactor
             driveTorque = currentEngineTorque * clutchFactor * gearbox.CurrentGearRatio * gearbox.finalDriveRatio;
         }
 
         currentWheelTorque = driveTorque; // Сохраняем для отладки
 
+        ApplyWheelTorque(driveTorque);
+
+        // Update readouts
+        currentGear = gearbox.CurrentGearIndex;
+    }
+
+    private void ApplyWheelTorque(float torque)
+    {
         // --- Применение к WheelColliders ---
         float torquePerWheel = 0;
         int drivenWheels = 0;
+        
         if (drivetrainMode == DrivetrainMode.AWD) drivenWheels = 4;
         else if (drivetrainMode == DrivetrainMode.FWD || drivetrainMode == DrivetrainMode.RWD) drivenWheels = 2;
-        if (drivenWheels > 0) torquePerWheel = driveTorque / drivenWheels;
+        
+        if (drivenWheels > 0) torquePerWheel = torque / drivenWheels;
 
         float appliedBrakeTorque = brakeInput * maxBrakeTorque;
 
-
         for (int i = 0; i < wheelColliders.Length; i++)
         {
-            if (!wheelColliders[i]) continue; // Пропуск если колесо не найдено
+            if (!wheelColliders[i]) continue;
+            
             // Apply Steering (to front wheels: index 0, 1)
             if (i < 2)
             {
@@ -239,24 +248,12 @@ public abstract class Driveable : Respawnable
                             (drivetrainMode == DrivetrainMode.FWD && i < 2) ||
                             (drivetrainMode == DrivetrainMode.RWD && i >= 2);
 
-            // --- Применяем тормоз ИЛИ момент ---
-            if (appliedBrakeTorque > 0.01f) // Если нажали тормоз
-            {
-                // wheelColliders[i].motorTorque = 0f; // Момент двигателя не применяем
-                wheelColliders[i].brakeTorque = appliedBrakeTorque; // Применяем тормоз
-            }
-            else // Если тормоз НЕ нажат
-            {
-                wheelColliders[i].brakeTorque = 0f; // Тормоз не применяем
-                wheelColliders[i].motorTorque = isDriven ? torquePerWheel : 0f; // Применяем момент, если колесо ведущее
-            }
+            wheelColliders[i].brakeTorque = appliedBrakeTorque; 
+            wheelColliders[i].motorTorque = isDriven ? torquePerWheel : 0f;
 
             // Update visual wheel models (if you have them)
             UpdateWheelVisuals(wheelColliders[i]);
         }
-
-        // Update readouts
-        currentGear = gearbox.CurrentGearIndex;
     }
 
 
@@ -290,14 +287,14 @@ public abstract class Driveable : Respawnable
     protected virtual void UpdateWheelVisuals(WheelCollider collider)
     {
         // Example: Find the corresponding visual transform and update rotation/position
-        // if (collider.transform.childCount > 0) { // Basic check
-        //     Transform visualWheel = collider.transform.GetChild(0); // Assuming visual is child
-        //     Vector3 position;
-        //     Quaternion rotation;
-        //     collider.GetWorldPose(out position, out rotation);
-        //     visualWheel.transform.position = position;
-        //     visualWheel.transform.rotation = rotation;
-        // }
+        if (collider.transform.childCount > 0) { // Basic check
+            Transform visualWheel = collider.transform.GetChild(0); // Assuming visual is child
+            Vector3 position;
+            Quaternion rotation;
+            collider.GetWorldPose(out position, out rotation);
+            visualWheel.transform.position = position;
+            visualWheel.transform.rotation = rotation;
+        }
     }
 
 
@@ -357,12 +354,10 @@ public abstract class Driveable : Respawnable
         if (engine.isRunning)
         {
             engine.StopEngine();
-            Debug.Log("Engine stopped.");
         }
         else
         {
             engine.StartEngine();
-            Debug.Log("Engine started.");
         }
     }
 }
