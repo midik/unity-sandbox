@@ -29,7 +29,7 @@ public struct TerrainHeightJob : IJobParallelFor
     [ReadOnly] public float domainWarpOffsetZ;
 
     // Предвычисленная кривая высот
-    [ReadOnly] public NativeArray<float> heightCurveValues;
+    [ReadOnly] [NativeDisableParallelForRestriction] public NativeArray<float> heightCurveValues;
     [ReadOnly] public int heightCurveSamples;
 
     // Параметры шумовых долин
@@ -42,11 +42,12 @@ public struct TerrainHeightJob : IJobParallelFor
 
     // Параметры сплайновых долин
     [ReadOnly] public bool useSplineValleys;
-    [ReadOnly] public NativeArray<float> splineFactors; // Предвычисленные значения влияния сплайнов
+    [ReadOnly] [NativeDisableParallelForRestriction] public NativeArray<float> splineFactors; // Предвычисленные значения влияния сплайнов
     [ReadOnly] public float splineValleyDepth;
 
     // Выходной массив высот
-    [WriteOnly] public NativeArray<float> heights;
+    [NativeDisableParallelForRestriction] // Разрешаем доступ к произвольным элементам в этом массиве
+    public NativeArray<float> heights;
 
     public void Execute(int index)
     {
@@ -64,7 +65,7 @@ public struct TerrainHeightJob : IJobParallelFor
         float finalHeight = baseHeight;
 
         // Применение сплайновых долин (используем предвычисленные значения)
-        if (useSplineValleys)
+        if (useSplineValleys && index < splineFactors.Length)
         {
             float splineFactor = splineFactors[index];
             float heightReduction = splineFactor * splineValleyDepth;
@@ -106,7 +107,8 @@ public struct TerrainHeightJob : IJobParallelFor
             frequency *= lacunarity;
         }
 
-        float normalizedHeight = (maxValue > 0) ? (totalHeight / maxValue) : 0;
+        // Предотвращаем деление на ноль
+        float normalizedHeight = (maxValue > 0.001f) ? (totalHeight / maxValue) : 0;
 
         // Применение кривой высот
         float curvedHeight = SampleCurve(normalizedHeight);
@@ -130,11 +132,25 @@ public struct TerrainHeightJob : IJobParallelFor
 
     private float SampleCurve(float t)
     {
-        // Линейная интерполяция предвычисленной кривой высот
+        // Проверка на пустой массив
+        if (heightCurveValues.Length == 0)
+            return t; // Если массив пустой, возвращаем исходное значение
+
+        // Строгая проверка границ для t
         t = math.clamp(t, 0f, 1f);
-        float indexFloat = t * (heightCurveSamples - 1);
+        
+        // Проверка граничных случаев
+        if (heightCurveSamples <= 1)
+            return heightCurveValues.Length > 0 ? heightCurveValues[0] : t;
+            
+        // Безопасное вычисление индексов
+        float indexFloat = t * (math.min(heightCurveSamples, heightCurveValues.Length) - 1);
         int index0 = (int)math.floor(indexFloat);
-        int index1 = math.min(index0 + 1, heightCurveSamples - 1);
+        
+        // Дополнительная проверка границ индексов
+        index0 = math.clamp(index0, 0, math.min(heightCurveSamples, heightCurveValues.Length) - 1);
+        int index1 = math.min(index0 + 1, math.min(heightCurveSamples, heightCurveValues.Length) - 1);
+        
         float frac = indexFloat - index0;
         float value0 = heightCurveValues[index0];
         float value1 = heightCurveValues[index1];
