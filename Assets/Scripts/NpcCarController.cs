@@ -10,7 +10,7 @@ public class NpcCarController : Driveable
 
     [Header("AI Settings")]
     public float edgeDetectionForwardDistance = 2.0f;
-    public float edgeDetectionMaxDrop = 10.0f; // Настрой в инспекторе
+    public float edgeDetectionMaxDrop = 10.0f;
     public float edgeRaySideOffset = 0.6f;
     public float avoidanceSteerForce = 1.0f;
     public float reverseTime = 1.0f;
@@ -96,7 +96,7 @@ public class NpcCarController : Driveable
         if (distance <= stopDistance)
         {
             logger?.Log("NPC State: Target reached. Stopping.");
-            UpdatePowertrain(0f, 0f, 0f, 0f);
+            UpdatePowertrain(0f, 1f, 0f, 0f);
             return;
         }
 

@@ -76,8 +76,6 @@ public abstract class Driveable : Respawnable
 
         engine.Initialize();
         gearbox.Initialize();
-
-        clutch = new Clutch();
         clutch.Initialize(engine.idleRPM);
 
         currentSpeedKmh = 0f;

@@ -27,7 +27,10 @@ public class Engine
 
     public float CurrentRPM { get; private set; }
     public bool isRunning { get; private set; }
-
+    
+    [Header("Readouts (Read Only)")]
+    [SerializeField, ReadOnly] protected float slippingFactor;
+    
     private float potentialPositiveTorque;
     private float engineResistanceTorque;
     private float lastNetTorque; // Сохраняем последний рассчитанный чистый момент
@@ -83,7 +86,8 @@ public class Engine
         // Подтягиваем к целевым оборотам от колес по факторам сцепления
         if (!isTransmissionDisconnected)
         {
-            CurrentRPM = Mathf.Lerp(CurrentRPM, externalRPM, clutchFactor * clutchSlippingFactor);
+            slippingFactor = clutchFactor * clutchSlippingFactor;
+            CurrentRPM = Mathf.Lerp(CurrentRPM, externalRPM, slippingFactor);
         }
         else
         {

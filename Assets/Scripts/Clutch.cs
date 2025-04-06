@@ -4,15 +4,19 @@ using UnityEngine;
 public class Clutch
 {
     [Tooltip("Кривая включения сцепления. X=Обороты выше холостых (норм. 0..1), Y=Фактор сцепления (0..1)")]
-    public AnimationCurve engagementCurve = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
+    public AnimationCurve engagementCurve; // = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
     [Tooltip("Кривая включения сцепления. X=Обороты выше холостых (норм. 0..1), Y=Фактор сцепления (0..1)")]
-    public AnimationCurve slippingCurve = AnimationCurve.Linear(0f, 0.5f, 1f, 1f);
+    public AnimationCurve slippingCurve; // = AnimationCurve.Linear(0f, 0.5f, 1f, 1f);
     [Tooltip("Диапазон оборотов (выше холостых), на котором происходит включение сцепления от 0 до 1")]
     public float engageRPMRange = 1000f; // Например, сцепление полностью включится при idleRPM + 600 RPM
 
+    protected float clutchFactor { get; private set; }
+    protected float clutchSlippingFactor { get; private set; }
+    
     [Header("Readouts (Read Only)")]
-    [SerializeField] protected float clutchFactor { get; private set; }
-    [SerializeField] protected float clutchSlippingFactor { get; private set; }
+    [SerializeField, ReadOnly] protected float clutchFactorReadout;
+    [SerializeField, ReadOnly] protected float clutchSlippingFactorReadout;
+
 
     private float idleRPM;
 
@@ -30,6 +34,7 @@ public class Clutch
         {
             clutchFactor = 1.0f;
             clutchSlippingFactor = 1f;
+            clutchSlippingFactorReadout = clutchSlippingFactor;
         }
         else
         {
@@ -38,16 +43,20 @@ public class Clutch
             clutchFactor = engagementCurve.Evaluate(normalizedEngageRPM);
             clutchSlippingFactor = slippingCurve.Evaluate(normalizedEngageRPM);
             // clutchSlippingFactor = Mathf.InverseLerp(idleRPM, idleRPM + engageRPMRange, currentRPM) / 2;
+            
+            clutchSlippingFactorReadout = clutchSlippingFactor;
         }
 
         clutchFactor = Mathf.Clamp01(clutchFactor);
         clutchSlippingFactor = Mathf.Clamp01(clutchSlippingFactor);
+        clutchSlippingFactorReadout = clutchSlippingFactor;
     }
 
     public void Reset()
     {
         clutchFactor = 0f;
         clutchSlippingFactor = 0f;
+        clutchSlippingFactorReadout = clutchSlippingFactor;
     }
     
     public float GetClutchFactor() => clutchFactor;
