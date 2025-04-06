@@ -63,7 +63,7 @@ public class NpcCarController : Driveable
         if (aliveDetector.isDead)
         {
             logger?.Log($"NPC State: Detected isDead=true. Starting respawn.");
-            UpdatePowertrain(0f, 0f, 0f, 0f);
+            Drive(0f, 0f, 0f, 0f);
             StartCoroutine(RespawnAfterDelay(3f));
             isRespawnPending = true;
             currentAvoidanceState = AvoidanceState.None;
@@ -83,11 +83,11 @@ public class NpcCarController : Driveable
             currentAvoidanceState = AvoidanceState.Reversing;
             avoidanceTimer = reverseTime;
             turnDirection = 1f;
-            UpdatePowertrain(0f, 1f, -1f, -1f);
+            Drive(0f, 1f, -1f, -1f);
             return;
         }
 
-        if (!target) { UpdatePowertrain(0f, 0f, 0f, 0f); return; }
+        if (!target) { Drive(0f, 0f, 0f, 0f); return; }
 
         Vector3 toTarget = target.position - transform.position;
         toTarget.y = 0f;
@@ -96,7 +96,7 @@ public class NpcCarController : Driveable
         if (distance <= stopDistance)
         {
             logger?.Log("NPC State: Target reached. Stopping.");
-            UpdatePowertrain(0f, 1f, 0f, 0f);
+            Drive(0f, 1f, 0f, 0f);
             return;
         }
 
@@ -116,7 +116,7 @@ public class NpcCarController : Driveable
         float finalSteerAngle = combinedSteerInput * steerAngle;
         float finalMotorTorque = 1f;
 
-        UpdatePowertrain(finalMotorTorque, 0f, finalSteerAngle, 1f);
+        Drive(finalMotorTorque, 0f, finalSteerAngle, 1f);
     }
 
     // Проверка края (лучи вниз)
@@ -236,7 +236,7 @@ public class NpcCarController : Driveable
         if (currentAvoidanceState == AvoidanceState.Reversing)
         {
             if (logger) logger.Log($"NPC State: Avoiding Edge - Reversing ({avoidanceTimer:F1}s left)");
-            UpdatePowertrain(0f, 1f, -1f, -1f);
+            Drive(0f, 1f, -1f, -1f);
             if (avoidanceTimer <= 0f)
             {
                 currentAvoidanceState = AvoidanceState.Turning;
@@ -249,7 +249,7 @@ public class NpcCarController : Driveable
             if (logger) logger.Log($"NPC State: Avoiding Edge - Turning { (turnDirection > 0 ? "Right" : "Left") } ({avoidanceTimer:F1}s left)");
             float turnSteerAngle = turnDirection * steerAngle * avoidanceSteerForce;
             float turnMotorTorque = 0.3f;
-            UpdatePowertrain(turnMotorTorque, 0f, turnSteerAngle, 0.3f);
+            Drive(turnMotorTorque, 0f, turnSteerAngle, 0.3f);
             if (avoidanceTimer <= 0f)
             {
                 currentAvoidanceState = AvoidanceState.None;
@@ -277,5 +277,17 @@ public class NpcCarController : Driveable
         isRespawnPending = false;
         currentAvoidanceState = AvoidanceState.None;
         if (logger) logger.Log("NPC State: Respawn completed");
+    }
+
+    private void Drive(float torque, float brake, float steerAngle, float throttle)
+    {
+        if (torque > 0.01f)
+        {
+            if (!engine.isRunning)
+            {
+                engine.StartEngine();
+            }
+        }
+        UpdatePowertrain(torque, brake, steerAngle, throttle);
     }
 }
