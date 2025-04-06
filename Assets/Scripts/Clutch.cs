@@ -11,8 +11,8 @@ public class Clutch
     public float engageRPMRange = 1000f; // Например, сцепление полностью включится при idleRPM + 600 RPM
 
     [Header("Readouts (Read Only)")]
-    [SerializeField, ReadOnly] protected float clutchFactor { get; private set; }
-    [SerializeField, ReadOnly] protected float clutchSlippingFactor { get; private set; }
+    [SerializeField] protected float clutchFactor { get; private set; }
+    [SerializeField] protected float clutchSlippingFactor { get; private set; }
 
     private float idleRPM;
 

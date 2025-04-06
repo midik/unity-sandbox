@@ -24,7 +24,6 @@ public class ReadOnlyDrawer : UnityEditor.PropertyDrawer
 }
 #endif
 
-
 public abstract class Driveable : Respawnable
 {
     [Header("Handling")] public float steerAngle = 30f;

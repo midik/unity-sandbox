@@ -172,6 +172,34 @@ public class Gearbox
         }
     }
     
+    internal void SetGear(int gearIndex)
+    {
+        if (gearIndex < 0 || gearIndex >= gearRatios.Length)
+        {
+            Debug.LogError($"Invalid gear index: {gearIndex}");
+            return;
+        }
+
+        CurrentGearIndex = gearIndex;
+    }
+    
+    internal void SetAutomaticMode(AutomaticMode mode)
+    {
+        CurrentAutomaticMode = mode;
+        if (mode == AutomaticMode.D)
+        {
+            CurrentGearIndex = 2; // 1st gear
+        }
+        else if (mode == AutomaticMode.R)
+        {
+            CurrentGearIndex = 0; // Reverse
+        }
+        else if (mode == AutomaticMode.N)
+        {
+            CurrentGearIndex = 1; // Neutral
+        }
+    }
+    
     public bool IsNeutral()
     {
         return CurrentGearIndex == 1;
