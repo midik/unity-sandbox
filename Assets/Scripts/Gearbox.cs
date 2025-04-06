@@ -172,5 +172,10 @@ public class Gearbox
             }
         }
     }
+    
+    public bool IsNeutral()
+    {
+        return CurrentGearIndex == 1;
+    }
 
 }

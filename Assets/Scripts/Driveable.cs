@@ -1,5 +1,5 @@
+using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Serialization;
 
 // Helper attribute for ReadOnly fields in Inspector
 public class ReadOnlyAttribute : PropertyAttribute
@@ -55,6 +55,9 @@ public abstract class Driveable : Respawnable
     protected float currentSpeedKmh;
 
     [SerializeField, ReadOnly] protected float engineRPM;
+    [SerializeField, ReadOnly] protected float externalRPM;
+    [SerializeField, ReadOnly] protected float drivenWheelRPM;
+    [SerializeField, ReadOnly] protected float[] drivenWheelsRPM;
     [SerializeField, ReadOnly] protected int currentGear;
     [SerializeField, ReadOnly] protected float currentEngineTorque;
     [SerializeField, ReadOnly] protected float currentWheelTorque; // Torque *after* gearbox/diff
@@ -66,7 +69,8 @@ public abstract class Driveable : Respawnable
     protected float steeringInput; // -1..1
 
     private WheelCollider[] wheelColliders = new WheelCollider[4]; // FL, FR, RL, RR order assumed
-    private float targetEngineRPMFromWheels; // Добавим для расчета внутри UpdatePowertrain
+    private const int rpmSmoothingWindow = 30;
+    private Queue<float>[] rpmHistory;
 
 
     protected override void Awake() // Use Awake for component references
@@ -85,10 +89,19 @@ public abstract class Driveable : Respawnable
         gearbox.Initialize();
         currentSpeedKmh = 0f;
         engineRPM = engine.idleRPM;
+        externalRPM = 0f;
+        drivenWheelRPM = 0f;
+        drivenWheelsRPM = new float[4]; // Assuming 4 wheels
         currentGear = gearbox.CurrentGearIndex;
         currentEngineTorque = 0f;
         currentWheelTorque = 0f;
-        clutchFactor = 0f; // Начинаем с выключенным сцеплением
+        clutchFactor = 0f;
+        
+        rpmHistory = new Queue<float>[wheelColliders.Length];
+        for (int i = 0; i < wheelColliders.Length; i++)
+        {
+            rpmHistory[i] = new Queue<float>();
+        }
     }
 
     // Helper to find wheels if not manually assigned
@@ -129,18 +142,15 @@ public abstract class Driveable : Respawnable
         brakeInput = Mathf.Clamp01(brake);
         steeringInput = Mathf.Clamp(steering, -1f, 1f);
         
-        if (!engine.isRunning) {}
-
-        // Добавим проверку на rb, если он вдруг не найден
-        currentSpeedKmh = rb ? rb.linearVelocity.magnitude * 3.6f : 0f;
+        currentSpeedKmh = rb.linearVelocity.magnitude * 3.6f; // Convert m/s to km/h
+        
+        // todo
+        if (engine.isRunning) {}
 
         // Calculate current speed & wheel RPM
-        float drivenWheelRPM = CalculateDrivenWheelRPM();
+        drivenWheelRPM = CalculateDrivenWheelRPM();
 
         bool wasShifted = false; // Флаг для отслеживания переключения
-
-        // Определяем, пытается ли водитель ехать (газ нажат ИЛИ обороты выше холостых)
-        // bool tryingToEngage = throttleInput > 0.01f || engine.CurrentRPM > engine.idleRPM;
 
         // Рассчитываем фактор сцепления
         if (gearbox.CurrentGearIndex != 0 && gearbox.CurrentGearIndex != 2)
@@ -166,18 +176,23 @@ public abstract class Driveable : Respawnable
         // Гарантируем, что фактор всегда в пределах [0, 1]
         clutchFactor = Mathf.Clamp01(clutchFactor);
 
+        bool isTransmissionDisconnected = gearbox.IsNeutral() || clutchFactor <= 0.01f;
+
         // --- Обновляем коробку передач, если автомат ---
         if (gearbox.IsAutomatic)
         {
             wasShifted = gearbox.UpdateGear(engine.CurrentRPM, throttleInput, currentSpeedKmh, moveY, Time.fixedDeltaTime);
         }
-        
-        // Рассчитываем целевые обороты двигателя от колес
-        float totalDriveRatio = gearbox.CurrentGearRatio * gearbox.finalDriveRatio;
-        float targetEngineRPMFromWheels = 0f;
-        if (Mathf.Abs(totalDriveRatio) > 0.01f)
+
+        if (!isTransmissionDisconnected)
         {
-            targetEngineRPMFromWheels = drivenWheelRPM * Mathf.Abs(totalDriveRatio);
+            // Рассчитываем целевые обороты двигателя от колес
+            float totalDriveRatio = gearbox.CurrentGearRatio * gearbox.finalDriveRatio;
+            
+            if (Mathf.Abs(totalDriveRatio) > 0.01f)
+            {
+                externalRPM = drivenWheelRPM * Mathf.Abs(totalDriveRatio);
+            }
         }
 
         // Вызываем основной метод обновления движка.
@@ -186,19 +201,20 @@ public abstract class Driveable : Respawnable
             throttleInput,
             Time.fixedDeltaTime,
             clutchFactor,
-            targetEngineRPMFromWheels
+            isTransmissionDisconnected,
+            externalRPM
         );
         
         engineRPM = engine.CurrentRPM; // Обновляем для отображения
 
         // --- Расчет момента на колесах ---
         float driveTorque = 0;
-        if (gearbox.IsInGear)
+        if (!isTransmissionDisconnected)
         {
             driveTorque = currentEngineTorque * clutchFactor * gearbox.CurrentGearRatio * gearbox.finalDriveRatio;
         }
 
-        currentWheelTorque = driveTorque; // Сохраняем для отладки
+        currentWheelTorque = driveTorque;
 
         ApplyWheelTorque(driveTorque);
 
@@ -241,9 +257,26 @@ public abstract class Driveable : Respawnable
             UpdateWheelVisuals(wheelColliders[i]);
         }
     }
+    
 
 
-    // Calculate average RPM of the wheels that are currently driven
+    private float CalculateSmoothedRPM(int wheelIndex, float currentRPM)
+    {
+        var history = rpmHistory[wheelIndex];
+        if (history.Count >= rpmSmoothingWindow)
+        {
+            history.Dequeue();
+        }
+        history.Enqueue(currentRPM);
+
+        float sum = 0f;
+        foreach (var rpm in history)
+        {
+            sum += rpm;
+        }
+        return sum / history.Count;
+    }
+
     private float CalculateDrivenWheelRPM()
     {
         float totalRPM = 0f;
@@ -251,7 +284,7 @@ public abstract class Driveable : Respawnable
 
         for (int i = 0; i < wheelColliders.Length; i++)
         {
-            if (!wheelColliders[i]) continue; // Пропуск если колесо не найдено
+            if (!wheelColliders[i]) continue;
 
             bool isDriven = (drivetrainMode == DrivetrainMode.AWD) ||
                             (drivetrainMode == DrivetrainMode.FWD && i < 2) ||
@@ -259,12 +292,13 @@ public abstract class Driveable : Respawnable
 
             if (isDriven)
             {
-                totalRPM += wheelColliders[i].rpm;
+                float smoothedRPM = CalculateSmoothedRPM(i, wheelColliders[i].rpm);
+                totalRPM += smoothedRPM;
+                drivenWheelsRPM[i] = smoothedRPM;
                 drivenCount++;
             }
         }
 
-        // Избегаем деления на ноль, если нет ведущих колес (или они не найдены)
         return (drivenCount > 0) ? totalRPM / drivenCount : 0f;
     }
 
@@ -318,11 +352,11 @@ public abstract class Driveable : Respawnable
     }
 
     // Expose some data for HUD/Audio if needed
-    public float GetEngineRPM() => engine?.CurrentRPM ?? 0f;
+    public float GetEngineRPM() => engine.CurrentRPM;
 
-    public float GetEngineMaxRPM() => engine?.maxRPM ?? 4500f;
+    public float GetEngineMaxRPM() => engine.maxRPM;
 
-    public int GetCurrentGear() => gearbox?.CurrentGearIndex ?? 0;
+    public int GetCurrentGear() => gearbox.CurrentGearIndex;
 
     internal void ToggleGearboxMode()
     {
@@ -343,8 +377,8 @@ public abstract class Driveable : Respawnable
         }
         else
         {
-            engine.StartEngine();
             clutchFactor = 0f;
+            engine.StartEngine();
         }
     }
 }

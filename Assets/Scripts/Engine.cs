@@ -15,7 +15,8 @@ public class Engine
     [Tooltip("Максимальные обороты (ограничитель)")]
     public float maxRPM = 3500;
 
-    [Tooltip( "Инерция двигателя (влияет на скорость набора/сброса оборотов при свободном вращении). Больше = медленнее.")]
+    [Tooltip(
+        "Инерция двигателя (влияет на скорость набора/сброса оборотов при свободном вращении). Больше = медленнее.")]
     public float inertia = 0.15f; // kg*m^2 equivalent (tune this)
 
     [Tooltip("Коэффициент внутреннего трения/сопротивления двигателя (помогает оборотам падать к холостым)")]
@@ -28,7 +29,6 @@ public class Engine
     public float CurrentRPM { get; private set; }
     public bool isRunning { get; private set; }
 
-    private float generatedTorque;
     private float potentialPositiveTorque;
     private float engineResistanceTorque;
     private float lastNetTorque; // Сохраняем последний рассчитанный чистый момент
@@ -42,20 +42,20 @@ public class Engine
     // Обновляет состояние двигателя и возвращает МОМЕНТ, который двигатель МОЖЕТ выдать на ТЕКУЩИХ оборотах.
     // Если трансмиссия разомкнута, CurrentRPM устанавливается ИЗВНЕ через SetRPMFromLoad().
     // В этом методе мы его не трогаем в таком случае.
-    public float UpdateAndCalculateTorque(float throttleInput, float deltaTime, float clutchFactor, float externalRPM)
+    public float UpdateAndCalculateTorque(float throttleInput, float deltaTime, float clutchFactor,
+        bool isTransmissionDisconnected, float externalRPM)
     {
         if (!isRunning)
         {
             // Если двигатель не запущен, возвращаем 0 момент
-            generatedTorque = 0f;
             potentialPositiveTorque = 0f;
             engineResistanceTorque = 0f;
             lastNetTorque = 0f;
             return 0f;
         }
-        
+
         throttleInput = Mathf.Clamp01(throttleInput);
-        
+
 
         // --- ЛОГИКА ОБНОВЛЕНИЯ RPM ---
 
@@ -80,18 +80,27 @@ public class Engine
         // Изменяем RPM на основе чистого момента и инерции
         CurrentRPM += (netTorque / inertia) * deltaTime;
 
-        CurrentRPM = Mathf.Clamp(CurrentRPM, idleRPM * 0.5f, maxRPM);
-            
         // Подтягиваем с целевыми оборотами от колес по фактору сцепления
-        CurrentRPM = Mathf.Lerp(CurrentRPM, externalRPM, clutchFactor);
-        
-        // Если обороты упали слишком низко, двигатель глохнет
-        if (CurrentRPM <= stallRPM)
+        if (!isTransmissionDisconnected)
         {
-            StallEngine($"Free RPM = {CurrentRPM}");
-            return 0f;
+            CurrentRPM = Mathf.Lerp(CurrentRPM, externalRPM, clutchFactor);
         }
-            
+        else
+        {
+            // Дополнительно плавно подтягиваем к idleRPM, если обороты ниже и газ отпущен
+            if (CurrentRPM < idleRPM && throttleInput < 0.01f)
+            {
+                CurrentRPM = Mathf.Lerp(CurrentRPM, idleRPM, deltaTime * 1.5f);
+            }
+        }
+
+        // // Если обороты упали слишком низко, двигатель глохнет
+        // if (CurrentRPM <= stallRPM)
+        // {
+        //     StallEngine($"RPM = {CurrentRPM}");
+        //     return 0f;
+        // }
+
         // Если обороты превышают максимум, ограничиваем их
         if (CurrentRPM > maxRPM)
         {
@@ -104,26 +113,20 @@ public class Engine
         engineResistanceTorque = CurrentRPM * internalFrictionFactor * engineBrakeFactor;
 
         // Рассчитываем чистый момент
-        lastNetTorque = (potentialPositiveTorque * throttleInput) - engineResistanceTorque;
+        if (isTransmissionDisconnected)
+        {
+            lastNetTorque = 0f;
+        }
+        else
+        {
+            lastNetTorque = potentialPositiveTorque * throttleInput - engineResistanceTorque;
+        }
 
         // Debug.Log($"[{Time.frameCount}] Engine Update: RPM={CurrentRPM:F0}, throttle={throttleInput:F2}, clutch={clutchEngaged}, potentialTorque={potentialPositiveTorque:F1}, resistance={engineResistanceTorque:F1}, NET TORQUE={lastNetTorque:F1}");
 
         return lastNetTorque;
     }
 
-    // Метод для ВНЕШНЕЙ установки RPM (когда сцепление включено)
-    public void SetRPM(float rpm)
-    {
-        // Если обороты упали слишком низко, двигатель глохнет
-        if (CurrentRPM <= stallRPM)
-        {
-            StallEngine($"Load RPM = {CurrentRPM}");
-            return;
-        }
-
-        // Просто устанавливаем RPM, полученный от колес, ограничивая его снизу нулем и сверху максимумом
-        CurrentRPM = Mathf.Clamp(rpm, 0, maxRPM);
-    }
 
     public void StartEngine()
     {
@@ -136,16 +139,14 @@ public class Engine
     {
         isRunning = false;
         CurrentRPM = 0f;
-        generatedTorque = 0f;
         potentialPositiveTorque = 0f;
         Debug.Log("Engine stopped.");
     }
-    
+
     public void StallEngine(string reason = "")
     {
         isRunning = false;
         CurrentRPM = 0f;
-        generatedTorque = 0f;
         potentialPositiveTorque = 0f;
         Debug.Log($"Engine stalled! ({reason})");
     }
