@@ -31,9 +31,8 @@ public class Gearbox
         ? gearRatios[CurrentGearIndex]
         : 0f;
 
-    public bool IsInGear => CurrentGearRatio != 0f; // True if not in Neutral
-
     private float timeSinceLastShift = 0f;
+
 
     public void Initialize()
     {

@@ -24,20 +24,15 @@ public class ReadOnlyDrawer : UnityEditor.PropertyDrawer
 }
 #endif
 
+
 public abstract class Driveable : Respawnable
 {
     [Header("Handling")] public float steerAngle = 30f;
 
-    [Header("Powertrain Components")] public Engine engine; // Assign or configure Engine settings here
-    public Gearbox gearbox; // Assign or configure Gearbox settings here
-
-    [Header("Clutch Settings")]
-    [Tooltip("Кривая включения сцепления. X=Обороты выше холостых (норм. 0..1), Y=Фактор сцепления (0..1)")]
-    public AnimationCurve
-        clutchEngagementCurve = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f); // Плавный старт по умолчанию
-
-    [Tooltip("Диапазон оборотов (выше холостых), на котором происходит включение сцепления от 0 до 1")]
-    public float clutchEngageRPMRange = 600f; // Например, сцепление полностью включится при idleRPM + 500 RPM
+    [Header("Powertrain Components")]
+    public Engine engine;
+    public Gearbox gearbox;
+    public Clutch clutch;
 
     [Header("Braking")] public float maxBrakeTorque = 5000f;
 
@@ -51,9 +46,8 @@ public abstract class Driveable : Respawnable
         RWD
     }
 
-    [Header("Readouts (Read Only)")] [SerializeField, ReadOnly]
-    protected float currentSpeedKmh;
-
+    [Header("Readouts (Read Only)")]
+    [SerializeField, ReadOnly] protected float currentSpeedKmh;
     [SerializeField, ReadOnly] protected float engineRPM;
     [SerializeField, ReadOnly] protected float externalRPM;
     [SerializeField, ReadOnly] protected float drivenWheelRPM;
@@ -61,8 +55,6 @@ public abstract class Driveable : Respawnable
     [SerializeField, ReadOnly] protected int currentGear;
     [SerializeField, ReadOnly] protected float currentEngineTorque;
     [SerializeField, ReadOnly] protected float currentWheelTorque; // Torque *after* gearbox/diff
-    [SerializeField, ReadOnly] protected float clutchFactor;
-    [SerializeField, ReadOnly] protected float clutchSlippingFactor;
 
     // --- Internal State ---
     protected float throttleInput; // 0..1
@@ -76,9 +68,6 @@ public abstract class Driveable : Respawnable
 
     protected override void Awake() // Use Awake for component references
     {
-        // base.Awake(); // Call base Awake if it exists and does something important
-        // В базовом Respawnable Awake вызывает InitializeRigidBody, base.Awake() не нужен, если мы вызываем InitializeRigidBody здесь или в Start базового класса
-        // InitializeRigidBody(); // Вызывается в базовом Awake
         FindWheelColliders(); // Find colliders if not assigned
     }
 
@@ -88,6 +77,10 @@ public abstract class Driveable : Respawnable
 
         engine.Initialize();
         gearbox.Initialize();
+
+        clutch = new Clutch();
+        clutch.Initialize(engine.idleRPM);
+
         currentSpeedKmh = 0f;
         engineRPM = engine.idleRPM;
         externalRPM = 0f;
@@ -96,7 +89,6 @@ public abstract class Driveable : Respawnable
         currentGear = gearbox.CurrentGearIndex;
         currentEngineTorque = 0f;
         currentWheelTorque = 0f;
-        clutchFactor = 0f;
 
         rpmHistory = new Queue<float>[wheelColliders.Length];
         for (int i = 0; i < wheelColliders.Length; i++)
@@ -123,7 +115,6 @@ public abstract class Driveable : Respawnable
             }
         }
 
-        // Убедимся, что Rigidbody есть (на случай, если base.Start не вызвался или был переопределен без вызова)
         if (!rb)
         {
             InitializeRigidBody(); // Вызываем метод из Respawnable
@@ -145,7 +136,6 @@ public abstract class Driveable : Respawnable
 
         currentSpeedKmh = rb.linearVelocity.magnitude * 3.6f; // Convert m/s to km/h
 
-        // todo
         if (engine.isRunning)
         {
         }
@@ -155,31 +145,10 @@ public abstract class Driveable : Respawnable
 
         bool wasShifted = false; // Флаг для отслеживания переключения
 
-        // Рассчитываем фактор сцепления
-        if (gearbox.CurrentGearIndex != 0 && gearbox.CurrentGearIndex != 2)
-        {
-            // Бросаем сцепление на всех передачах кроме задней и первой
-            clutchFactor = 1.0f;
-            clutchSlippingFactor = 1f;
-        }
-        else
-        {
-            // Рассчитываем обороты относительно начала включения (idleRPM)
-            float rpmAboveIdle = engine.CurrentRPM - engine.idleRPM;
-            // Нормализуем эти обороты в диапазоне [0, clutchEngageRPMRange] -> [0, 1]
-            float normalizedEngageRPM = Mathf.Clamp01(rpmAboveIdle / clutchEngageRPMRange);
-            // Получаем фактор сцепления из кривой
-            clutchFactor = clutchEngagementCurve.Evaluate(normalizedEngageRPM);
-            // Рассчитываем фактор проскальзывания сцепления
-            clutchSlippingFactor = Mathf.InverseLerp(engine.idleRPM, engine.idleRPM + clutchEngageRPMRange, engine.CurrentRPM);
-        }
+        clutch.UpdateClutchFactor(engine.CurrentRPM, gearbox.CurrentGearIndex);
 
-        // Гарантируем, что фактор всегда в пределах [0, 1]
-        clutchFactor = Mathf.Clamp01(clutchFactor);
+        bool isTransmissionDisconnected = gearbox.IsNeutral() || clutch.GetClutchFactor() <= 0.01f;
 
-        bool isTransmissionDisconnected = gearbox.IsNeutral() || clutchFactor <= 0.01f;
-
-        // --- Обновляем коробку передач, если автомат ---
         if (gearbox.IsAutomatic)
         {
             wasShifted = gearbox.UpdateGear(engine.CurrentRPM, throttleInput, currentSpeedKmh, moveY,
@@ -188,7 +157,6 @@ public abstract class Driveable : Respawnable
 
         if (!isTransmissionDisconnected)
         {
-            // Рассчитываем целевые обороты двигателя от колес
             float totalDriveRatio = gearbox.CurrentGearRatio * gearbox.finalDriveRatio;
 
             if (Mathf.Abs(totalDriveRatio) > 0.01f)
@@ -197,37 +165,32 @@ public abstract class Driveable : Respawnable
             }
         }
 
-        // Вызываем основной метод обновления движка.
-        // Он вернет потенциальный момент (положительный минус сопротивление) на ТЕКУЩИХ оборотах движка.
         currentEngineTorque = engine.UpdateAndCalculateTorque(
             throttleInput,
             Time.fixedDeltaTime,
-            clutchFactor,
-            clutchSlippingFactor,
+            clutch.GetClutchFactor(),
+            clutch.GetClutchSlippingFactor(),
             isTransmissionDisconnected,
             externalRPM
         );
 
-        engineRPM = engine.CurrentRPM; // Обновляем для отображения
+        engineRPM = engine.CurrentRPM;
 
-        // --- Расчет момента на колесах ---
         float driveTorque = 0;
         if (!isTransmissionDisconnected)
         {
-            driveTorque = currentEngineTorque * clutchFactor * gearbox.CurrentGearRatio * gearbox.finalDriveRatio;
+            driveTorque = currentEngineTorque * clutch.GetClutchFactor() * gearbox.CurrentGearRatio * gearbox.finalDriveRatio;
         }
 
         currentWheelTorque = driveTorque;
 
         ApplyWheelTorque(driveTorque);
 
-        // Update readouts
         currentGear = gearbox.CurrentGearIndex;
     }
 
     private void ApplyWheelTorque(float torque)
     {
-        // --- Применение к WheelColliders ---
         float torquePerWheel = 0;
         int drivenWheels = 0;
 
@@ -242,13 +205,11 @@ public abstract class Driveable : Respawnable
         {
             if (!wheelColliders[i]) continue;
 
-            // Apply Steering (to front wheels: index 0, 1)
             if (i < 2)
             {
                 wheelColliders[i].steerAngle = steeringInput * steerAngle;
             }
 
-            // Apply Motor Torque or Brake Torque
             bool isDriven = (drivetrainMode == DrivetrainMode.AWD) ||
                             (drivetrainMode == DrivetrainMode.FWD && i < 2) ||
                             (drivetrainMode == DrivetrainMode.RWD && i >= 2);
@@ -256,7 +217,6 @@ public abstract class Driveable : Respawnable
             wheelColliders[i].brakeTorque = appliedBrakeTorque;
             wheelColliders[i].motorTorque = isDriven ? torquePerWheel : 0f;
 
-            // Update visual wheel models (if you have them)
             UpdateWheelVisuals(wheelColliders[i]);
         }
     }
@@ -307,14 +267,11 @@ public abstract class Driveable : Respawnable
     }
 
 
-    // Placeholder for updating visual wheel meshes/transforms
     protected virtual void UpdateWheelVisuals(WheelCollider collider)
     {
-        // Example: Find the corresponding visual transform and update rotation/position
         if (collider.transform.childCount > 0)
         {
-            // Basic check
-            Transform visualWheel = collider.transform.GetChild(0); // Assuming visual is child
+            Transform visualWheel = collider.transform.GetChild(0);
             Vector3 position;
             Quaternion rotation;
             collider.GetWorldPose(out position, out rotation);
@@ -327,18 +284,16 @@ public abstract class Driveable : Respawnable
     protected void ToggleDrivetrain()
     {
         drivetrainMode++;
-        if (drivetrainMode > DrivetrainMode.RWD) drivetrainMode = DrivetrainMode.AWD; // Cycle through AWD, FWD, RWD
+        if (drivetrainMode > DrivetrainMode.RWD) drivetrainMode = DrivetrainMode.AWD;
         Debug.Log("Drivetrain mode: " + drivetrainMode);
     }
 
-    // Make sure Respawn resets powertrain state
-    protected override void OnRespawned() // Этот метод вызывается из Respawnable.RespawnRoutine()
+    protected override void OnRespawned()
     {
-        // base.OnRespawned();
         engine.Initialize();
         gearbox.Initialize();
+        clutch.Reset();
 
-        // Reset wheel torques immediately
         foreach (var wc in wheelColliders)
         {
             if (wc)
@@ -348,16 +303,13 @@ public abstract class Driveable : Respawnable
             }
         }
 
-        // Reset readouts
         currentSpeedKmh = 0f;
         engineRPM = engine.idleRPM;
         currentGear = gearbox.CurrentGearIndex;
         currentEngineTorque = 0f;
         currentWheelTorque = 0f;
-        clutchFactor = 0f; // Start disengaged after respawn
     }
 
-    // Expose some data for HUD/Audio if needed
     public float GetEngineRPM() => engine.CurrentRPM;
 
     public float GetEngineMaxRPM() => engine.maxRPM;
@@ -383,7 +335,7 @@ public abstract class Driveable : Respawnable
         }
         else
         {
-            clutchFactor = 0f;
+            clutch.Reset();
             engine.StartEngine();
         }
     }
