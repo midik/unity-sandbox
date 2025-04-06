@@ -43,7 +43,7 @@ public class Engine
     // Если трансмиссия разомкнута, CurrentRPM устанавливается ИЗВНЕ через SetRPMFromLoad().
     // В этом методе мы его не трогаем в таком случае.
     public float UpdateAndCalculateTorque(float throttleInput, float deltaTime, float clutchFactor,
-        bool isTransmissionDisconnected, float externalRPM)
+        float clutchSlippingFactor, bool isTransmissionDisconnected, float externalRPM)
     {
         if (!isRunning)
         {
@@ -67,6 +67,7 @@ public class Engine
         float frictionResistance = CurrentRPM * inertia * internalFrictionFactor;
 
         float idleCorrectionTorque = 0f;
+        
         // Если газ не нажат, добавляем "силу", тянущую к idleRPM
         if (throttleInput < 0.01f)
         {
@@ -80,10 +81,10 @@ public class Engine
         // Изменяем RPM на основе чистого момента и инерции
         CurrentRPM += (netTorque / inertia) * deltaTime;
 
-        // Подтягиваем с целевыми оборотами от колес по фактору сцепления
+        // Подтягиваем к целевым оборотам от колес по факторам сцепления
         if (!isTransmissionDisconnected)
         {
-            CurrentRPM = Mathf.Lerp(CurrentRPM, externalRPM, clutchFactor);
+            CurrentRPM = Mathf.Lerp(CurrentRPM, externalRPM, clutchFactor * clutchSlippingFactor);
         }
         else
         {
@@ -94,12 +95,12 @@ public class Engine
             }
         }
 
-        // // Если обороты упали слишком низко, двигатель глохнет
-        // if (CurrentRPM <= stallRPM)
-        // {
-        //     StallEngine($"RPM = {CurrentRPM}");
-        //     return 0f;
-        // }
+        // Если обороты упали слишком низко, двигатель глохнет
+        if (CurrentRPM <= stallRPM)
+        {
+            StallEngine($"RPM = {CurrentRPM}");
+            return 0f;
+        }
 
         // Если обороты превышают максимум, ограничиваем их
         if (CurrentRPM > maxRPM)
