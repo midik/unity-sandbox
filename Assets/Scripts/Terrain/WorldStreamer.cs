@@ -10,10 +10,10 @@ using UnityEngine.Splines;
 public class WorldStreamer : MonoBehaviour
 {
     [Header("Core Settings")]
-    [Tooltip("Объект игрока (или камеры), за которым следим")]
-    public Transform playerTransform;
+    [Tooltip("Объекты (игрок и NPC), за которыми следим")]
+    public List<Transform> trackedTransforms = new List<Transform>();
 
-    [Tooltip("Радиус загрузки чанков вокруг игрока (в чанках)")]
+    [Tooltip("Радиус загрузки чанков вокруг объектов (в чанках)")]
     public int loadRadius = 3; // Например, 3 -> загружена область 7x7 чанков
 
     [Tooltip("Как часто проверять необходимость загрузки/выгрузки (в секундах)")]
@@ -29,17 +29,28 @@ public class WorldStreamer : MonoBehaviour
     private Queue<Vector2Int> activationQueue = new Queue<Vector2Int>();
     private Queue<Vector2Int> deactivationQueue = new Queue<Vector2Int>();
 
-    private Vector2Int lastPlayerChunkCoord = new Vector2Int(int.MinValue, int.MinValue);
+    private Dictionary<Transform, Vector2Int> lastObjectChunkCoords = new Dictionary<Transform, Vector2Int>();
     private float chunkSize; // Размер чанка для расчетов
     private ChunkedTerrainGenerator terrainGenerator;
 
     void Start()
     {
-        if (!playerTransform)
+        if (trackedTransforms.Count == 0)
         {
-            Debug.LogError("WorldStreamer: Player Transform не назначен!", this);
+            Debug.LogError("WorldStreamer: No tracked transforms assigned!", this);
             enabled = false;
             return;
+        }
+
+        // Initialize last known positions for all tracked transforms
+        foreach (var t in trackedTransforms)
+        {
+            if (!t)
+            {
+                Debug.LogWarning("WorldStreamer: Null transform in trackedTransforms list!", this);
+                continue;
+            }
+            lastObjectChunkCoords[transform] = new Vector2Int(int.MinValue, int.MinValue);
         }
 
         terrainGenerator = GetComponent<ChunkedTerrainGenerator>();
@@ -75,7 +86,11 @@ public class WorldStreamer : MonoBehaviour
         loadingChunks.Clear();
         chunkPool.Clear();
         
-        Vector2Int layerChunkCoord = GetChunkCoordFromPos(playerTransform.position); 
+        // Get primary tracked transform (usually player) for initial chunk handling
+        Transform primaryTransform = trackedTransforms.Count > 0 ? trackedTransforms[0] : null;
+        if (primaryTransform == null) return;
+        
+        Vector2Int layerChunkCoord = GetChunkCoordFromPos(primaryTransform.position); 
 
         Debug.Log("Searching for pre-generated chunks...");
         foreach (Transform child in terrainGenerator.transform)
@@ -123,20 +138,44 @@ public class WorldStreamer : MonoBehaviour
 
     void UpdateChunks()
     {
-        Vector2Int newPlayerChunkCoord = GetChunkCoordFromPos(playerTransform.position);
-        if (newPlayerChunkCoord == lastPlayerChunkCoord) return;
-
-        lastPlayerChunkCoord = newPlayerChunkCoord;
-
+        bool anyTransformMoved = false;
         HashSet<Vector2Int> requiredCoords = new HashSet<Vector2Int>();
-        for (int x = -loadRadius; x <= loadRadius; x++)
+
+        // Check each tracked transform for movement and collect required chunks
+        foreach (var t in trackedTransforms)
         {
-            for (int z = -loadRadius; z <= loadRadius; z++)
+            if (!t) continue;
+
+            Vector2Int newChunkCoord = GetChunkCoordFromPos(t.position);
+            Vector2Int lastChunkCoord = Vector2Int.zero;
+            
+            if (!lastObjectChunkCoords.TryGetValue(t, out lastChunkCoord))
             {
-                requiredCoords.Add(new Vector2Int(lastPlayerChunkCoord.x + x, lastPlayerChunkCoord.y + z));
+                lastObjectChunkCoords[t] = newChunkCoord;
+                lastChunkCoord = newChunkCoord;
+                anyTransformMoved = true;
+            }
+            
+            if (newChunkCoord != lastChunkCoord)
+            {
+                lastObjectChunkCoords[t] = newChunkCoord;
+                anyTransformMoved = true;
+            }
+
+            // Add all chunks in radius around this transform to required set
+            for (int x = -loadRadius; x <= loadRadius; x++)
+            {
+                for (int z = -loadRadius; z <= loadRadius; z++)
+                {
+                    requiredCoords.Add(new Vector2Int(newChunkCoord.x + x, newChunkCoord.y + z));
+                }
             }
         }
 
+        // If no transform moved, nothing to update
+        if (!anyTransformMoved) return;
+
+        // Determine chunks to deactivate
         List<Vector2Int> activeCoordsToCheck = activeChunkObjects.Keys.ToList();
         foreach (Vector2Int activeCoord in activeCoordsToCheck)
         {
@@ -149,6 +188,7 @@ public class WorldStreamer : MonoBehaviour
             }
         }
 
+        // Determine chunks to activate
         foreach (Vector2Int coordToLoad in requiredCoords)
         {
             if (activeChunkObjects.ContainsKey(coordToLoad) || loadingChunks.Contains(coordToLoad)) continue;
@@ -437,11 +477,19 @@ public class WorldStreamer : MonoBehaviour
     }
 
     bool IsChunkStillRequired(Vector2Int coord) {
-        Vector2Int currentCenterChunk = GetChunkCoordFromPos(playerTransform.position);
-        int deltaX = Mathf.Abs(coord.x - currentCenterChunk.x);
-        int deltaY = Mathf.Abs(coord.y - currentCenterChunk.y);
-        int effectiveRadius = loadRadius;
-        return deltaX <= effectiveRadius && deltaY <= effectiveRadius;
+        foreach (var transform in trackedTransforms)
+        {
+            if (transform == null) continue;
+            
+            Vector2Int objectChunk = GetChunkCoordFromPos(transform.position);
+            int deltaX = Mathf.Abs(coord.x - objectChunk.x);
+            int deltaY = Mathf.Abs(coord.y - objectChunk.y);
+            
+            // If chunk is within load radius of any tracked transform, it's required
+            if (deltaX <= loadRadius && deltaY <= loadRadius)
+                return true;
+        }
+        return false;
     }
 
     Vector2Int GetChunkCoordFromPos(Vector3 pos)
