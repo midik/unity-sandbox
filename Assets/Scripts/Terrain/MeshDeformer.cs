@@ -11,7 +11,7 @@ public class MeshDeformer : MonoBehaviour
     public float trackTextureStrength = 1.0f;
     [Tooltip("Maximum track texture blend (0-1)")]
     [Range(0, 1)]
-    public float maxTrackBlend = 0.8f;
+    public float maxTrackBlend = 0.2f;
 
     private Mesh mesh;
     private Vector3[] vertices;
@@ -66,7 +66,7 @@ public class MeshDeformer : MonoBehaviour
                 
                 // Calculate texture blend value - stronger where deformation is deeper
                 float deformRatio = 1.0f - (deformableLayer[i] / maxDeformDepth); // 0 = no deform, 1 = max deform
-                float trackBlend = Mathf.Min(maxTrackBlend, vertexColors[i].r + (impact * trackTextureStrength));
+                float trackBlend = Mathf.Min(maxTrackBlend, vertexColors[i].r + (deformRatio * trackTextureStrength));
                 
                 // Store blend value in the red channel
                 vertexColors[i].r = trackBlend;

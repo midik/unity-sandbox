@@ -9,54 +9,92 @@ Shader "Custom/TerrainTrackShader"
     }
     SubShader
     {
-        Tags { "RenderType"="Opaque" }
+        Tags { "RenderType"="Opaque" "Queue"="Geometry" }
         LOD 200
 
-        CGPROGRAM
-        // Physically based Standard lighting model, and enable shadows on all light types
-        #pragma surface surf Standard fullforwardshadows
+        HLSLINCLUDE
+        #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+        #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+        ENDHLSL
 
-        // Use shader model 3.0 for better performance
-        #pragma target 3.0
-
-        sampler2D _MainTex;
-        sampler2D _TrackTex;
-
-        struct Input
+        Pass
         {
-            float2 uv_MainTex;
-            float2 uv_TrackTex;
-            float4 color : COLOR;  // Vertex colors from mesh
-        };
+            Name "ForwardLit"
+            Tags { "LightMode" = "UniversalForward" }
 
-        half _Glossiness;
-        half _Metallic;
+            HLSLPROGRAM
+            #pragma vertex vert
+            #pragma fragment frag
+            #pragma multi_compile _ _MAIN_LIGHT_SHADOWS
+            #pragma multi_compile _ _MAIN_LIGHT_SHADOWS_CASCADE
 
-        // Add instancing support for this shader
-        #pragma instancing_options assumeuniformscaling
-        UNITY_INSTANCING_BUFFER_START(Props)
-        UNITY_INSTANCING_BUFFER_END(Props)
+            struct Attributes
+            {
+                float4 positionOS : POSITION;
+                float2 uv : TEXCOORD0;
+                float4 color : COLOR;
+                float3 normalOS : NORMAL;
+            };
 
-        void surf (Input IN, inout SurfaceOutputStandard o)
-        {
-            // Sample the terrain texture
-            fixed4 terrainColor = tex2D(_MainTex, IN.uv_MainTex);
-            
-            // Sample the track texture
-            fixed4 trackColor = tex2D(_TrackTex, IN.uv_TrackTex);
-            
-            // Use the red channel of vertex color as the blend factor
-            float trackBlend = IN.color.r;
-            
-            // Blend between terrain and track textures
-            fixed4 finalColor = lerp(terrainColor, trackColor, trackBlend);
-            
-            o.Albedo = finalColor.rgb;
-            o.Metallic = _Metallic;
-            o.Smoothness = _Glossiness;
-            o.Alpha = finalColor.a;
+            struct Varyings
+            {
+                float4 positionCS : SV_POSITION;
+                float2 uv : TEXCOORD0;
+                float4 color : COLOR;
+                float3 normalWS : NORMAL;
+                float3 positionWS : TEXCOORD1;
+            };
+
+            TEXTURE2D(_MainTex);
+            TEXTURE2D(_TrackTex);
+            SAMPLER(sampler_MainTex);
+            SAMPLER(sampler_TrackTex);
+
+            CBUFFER_START(UnityPerMaterial)
+                float4 _MainTex_ST;
+                float4 _TrackTex_ST;
+                half _Glossiness;
+                half _Metallic;
+            CBUFFER_END
+
+            Varyings vert(Attributes input)
+            {
+                Varyings output = (Varyings)0;
+
+                VertexPositionInputs vertexInput = GetVertexPositionInputs(input.positionOS.xyz);
+                VertexNormalInputs normalInput = GetVertexNormalInputs(input.normalOS);
+
+                output.positionCS = vertexInput.positionCS;
+                output.positionWS = vertexInput.positionWS;
+                output.normalWS = normalInput.normalWS;
+                output.uv = TRANSFORM_TEX(input.uv, _MainTex);
+                output.color = input.color;
+                
+                return output;
+            }
+
+            half4 frag(Varyings input) : SV_Target
+            {
+                // Sample textures
+                half4 terrainColor = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv);
+                half4 trackColor = SAMPLE_TEXTURE2D(_TrackTex, sampler_TrackTex, input.uv);
+
+                // Blend using vertex color red channel
+                half4 albedo = lerp(terrainColor, trackColor, input.color.r);
+
+                // Get main light
+                Light mainLight = GetMainLight();
+
+                // Simple lighting calculation
+                half3 normalWS = normalize(input.normalWS);
+                half NdotL = saturate(dot(normalWS, mainLight.direction));
+                half3 ambient = SampleSH(normalWS);
+                
+                half3 finalColor = (ambient + mainLight.color * NdotL) * albedo.rgb;
+
+                return half4(finalColor, 1);
+            }
+            ENDHLSL
         }
-        ENDCG
     }
-    FallBack "Diffuse"
 }
