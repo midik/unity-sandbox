@@ -11,7 +11,7 @@ public class MeshDeformer : MonoBehaviour
     public float trackTextureStrength = 1.0f;
     [Tooltip("Maximum track texture blend (0-1)")]
     [Range(0, 1)]
-    public float maxTrackBlend = 0.2f;
+    public float maxTrackBlend = 0.8f;
 
     private Mesh mesh;
     private Vector3[] vertices;

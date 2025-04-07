@@ -29,22 +29,26 @@ public class ChunkedTerrainGenerator : MonoBehaviour
     public float noiseOffsetX = 20f; // Смещение основного шума по X
     public float noiseOffsetZ = 50f; // Смещение основного шума по Z
 
-    [Header("Domain Warping")] public bool useDomainWarping = true; // Включить/выключить
+    [Header("Domain Warping")]
+    public bool useDomainWarping = true; // Включить/выключить
     public float domainWarpScale = 100f; // Масштаб шума для искажения координат
     public float domainWarpStrength = 10f; // Сила искажения координат
     public float domainWarpOffsetX = 1000f; // Смещение для X-искажения (отличное от основного)
     public float domainWarpOffsetZ = 2000f; // Смещение для Z-искажения (отличное от основного)
 
-    [Header("Terrain Shaping")] public AnimationCurve heightCurve = AnimationCurve.Linear(0, 0, 1, 1); // Кривая высот
+    [Header("Terrain Shaping")]
+    public AnimationCurve heightCurve = AnimationCurve.Linear(0, 0, 1, 1); // Кривая высот
 
-    [Header("Valleys (Noise Based)")] public bool useValleys = true; // Включить/выключить шумные долины
+    [Header("Valleys (Noise Based)")]
+    public bool useValleys = true; // Включить/выключить шумные долины
     public float valleyNoiseScale = 150f; // Масштаб шума долин (обычно больше terrainScale)
     public float valleyDepth = 8f; // Максимальная глубина долины
     [Range(1f, 10f)] public float valleyWidthFactor = 4f; // Влияет на ширину/резкость краев долин (больше = уже)
     public float valleyNoiseOffsetX = 3000f; // Смещение шума долин X
     public float valleyNoiseOffsetZ = 4000f; // Смещение шума долин Z
 
-    [Header("Valleys (Spline Based)")] public bool useSplineValleys = true; // Включить/выключить сплайновые долины
+    [Header("Valleys (Spline Based)")]
+    public bool useSplineValleys = true; // Включить/выключить сплайновые долины
     public bool cutoffToBottom = true; // Срезать долину до дна (упрощенный вариант)
     public SplineContainer splineContainer; // Сюда перетащить объект со сплайнами из сцены
     public float splineValleyWidth = 5f; // Ширина плоского дна долины
@@ -55,7 +59,8 @@ public class ChunkedTerrainGenerator : MonoBehaviour
     // Ключи: (время=0, значение=1), (время=1, значение=0)
     public AnimationCurve valleySlopeCurve = AnimationCurve.EaseInOut(0f, 1f, 1f, 0f);
 
-    [Header("Road Generation")] public bool generateRoad = true;
+    [Header("Road Generation")]
+    public bool generateRoad = true;
 
     [Tooltip("Объект, в который будут помещены все сегменты дороги")]
     public GameObject roads;
@@ -72,15 +77,32 @@ public class ChunkedTerrainGenerator : MonoBehaviour
     [Tooltip("Насколько приподнять меш дороги над террейном")]
     public float roadRaise = 0.05f;
 
-    [Header("Deformation")] public float deformRadius = 0.35f;
+    [Header("Deformation")]
+    public float deformRadius = 0.35f;
     public float deformStrength = 0.1f;
     public float maxDeformDepth = 0.2f;
 
-    [Header("Materials")] public Material terrainMaterial;
+    [Header("Materials")]
+    public Material terrainMaterial;
     public PhysicsMaterial physicsMaterial;
 
     public static event Action OnChunksRegenerated;
     internal List<Spline> cachedSplines = null;
+    
+    private static readonly int SceneView1 = Shader.PropertyToID("_SceneView");
+    
+    
+    private void Awake()
+    {
+        // Disable scene view mode (normal blending)
+        terrainMaterial.SetFloat(SceneView1, 0);
+    }
+
+    private void OnDestroy()
+    {
+        // Enable scene view mode (no blending)
+        terrainMaterial.SetFloat(SceneView1, 1);
+    }
 
     // Метод для вызова из Context Menu в редакторе
     [ContextMenu("Terrain - Generate")]

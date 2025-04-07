@@ -4,8 +4,9 @@ Shader "Custom/TerrainTrackShader"
     {
         _MainTex ("Terrain Texture", 2D) = "white" {}
         _TrackTex ("Track Texture", 2D) = "white" {}
-        _Glossiness ("Smoothness", Range(0,1)) = 0.5
+        _Glossiness ("Smoothness", Range(0,1)) = 0.8
         _Metallic ("Metallic", Range(0,1)) = 0.0
+        [Toggle] _SceneView ("Scene View Fix", Float) = 0
     }
     SubShader
     {
@@ -73,23 +74,22 @@ Shader "Custom/TerrainTrackShader"
                 return output;
             }
 
+            float _SceneView;
+
             half4 frag(Varyings input) : SV_Target
             {
-                // Sample textures
                 half4 terrainColor = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv);
                 half4 trackColor = SAMPLE_TEXTURE2D(_TrackTex, sampler_TrackTex, input.uv);
 
-                // Blend using vertex color red channel
-                half4 albedo = lerp(terrainColor, trackColor, input.color.r);
+                // Use vertex color only if not in scene view or if scene view fix is disabled
+                float blendFactor = _SceneView > 0.5 ? 0.0 : input.color.r;
+                half4 albedo = lerp(terrainColor, trackColor, blendFactor);
 
-                // Get main light
+                // Rest of the lighting calculations remain the same
                 Light mainLight = GetMainLight();
-
-                // Simple lighting calculation
                 half3 normalWS = normalize(input.normalWS);
                 half NdotL = saturate(dot(normalWS, mainLight.direction));
                 half3 ambient = SampleSH(normalWS);
-                
                 half3 finalColor = (ambient + mainLight.color * NdotL) * albedo.rgb;
 
                 return half4(finalColor, 1);
