@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 // Helper attribute for ReadOnly fields in Inspector
 public class ReadOnlyAttribute : PropertyAttribute
@@ -26,7 +27,8 @@ public class ReadOnlyDrawer : UnityEditor.PropertyDrawer
 
 public abstract class Driveable : Respawnable
 {
-    [Header("Handling")] public float steerAngle = 30f;
+    [Header("Handling")]
+    public float maxSteeringAngle = 30f;
 
     [Header("Powertrain Components")]
     public Engine engine;
@@ -204,7 +206,7 @@ public abstract class Driveable : Respawnable
 
             if (i < 2)
             {
-                wheelColliders[i].steerAngle = steeringInput * steerAngle;
+                wheelColliders[i].steerAngle = steeringInput * maxSteeringAngle;
             }
 
             bool isDriven = (drivetrainMode == DrivetrainMode.AWD) ||

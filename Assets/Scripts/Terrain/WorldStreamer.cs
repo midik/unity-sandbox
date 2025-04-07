@@ -22,6 +22,8 @@ public class WorldStreamer : MonoBehaviour
 
     [Tooltip("Сколько чанков активировать/деактивировать максимум за кадр")]
     public int chunksPerFrame = 2; // Настрой это значение для баланса
+    
+    public ChunkedTerrainGenerator terrainGenerator { get; private set; }
 
     private Dictionary<Vector2Int, GameObject> activeChunkObjects = new Dictionary<Vector2Int, GameObject>();
     private HashSet<Vector2Int> loadingChunks = new HashSet<Vector2Int>();
@@ -32,7 +34,16 @@ public class WorldStreamer : MonoBehaviour
 
     private Dictionary<Transform, Vector2Int> lastObjectChunkCoords = new Dictionary<Transform, Vector2Int>();
     private float chunkSize; // Размер чанка для расчетов
-    private ChunkedTerrainGenerator terrainGenerator;
+
+    private void Awake()
+    {
+        terrainGenerator = GetComponent<ChunkedTerrainGenerator>();
+        if (!terrainGenerator)
+        {
+            Debug.LogError("WorldStreamer: Terrain Generator (на этом же объекте) не найден!", this);
+            enabled = false;
+        }
+    }
 
     void Start()
     {
@@ -52,14 +63,6 @@ public class WorldStreamer : MonoBehaviour
                 continue;
             }
             lastObjectChunkCoords[transform] = new Vector2Int(int.MinValue, int.MinValue);
-        }
-
-        terrainGenerator = GetComponent<ChunkedTerrainGenerator>();
-        if (!terrainGenerator)
-        {
-            Debug.LogError("WorldStreamer: Terrain Generator (на этом же объекте) не найден!", this);
-            enabled = false;
-            return;
         }
 
         chunkSize = terrainGenerator.sizePerChunk;

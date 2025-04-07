@@ -88,8 +88,8 @@ public class Gearbox
         if (CurrentGearIndex != previousGear)
         {
             timeSinceLastShift = 0f;
-            Debug.Log(
-                $"Shifted to gear index: {CurrentGearIndex} (Ratio: {CurrentGearRatio:F2}) at RPM: {engineRPM:F0}");
+            // Debug.Log(
+            //     $"Shifted to gear index: {CurrentGearIndex} (Ratio: {CurrentGearRatio:F2}) at RPM: {engineRPM:F0}");
             return true;
         }
 
@@ -176,7 +176,7 @@ public class Gearbox
     {
         if (gearIndex < 0 || gearIndex >= gearRatios.Length)
         {
-            Debug.LogError($"Invalid gear index: {gearIndex}");
+            // Debug.LogError($"Invalid gear index: {gearIndex}");
             return;
         }
 

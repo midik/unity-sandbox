@@ -14,18 +14,19 @@ using UnityEditor; // Добавляем для ProgressBar
 
 public class ChunkedTerrainGenerator : MonoBehaviour
 {
-    [Header("Chunk Settings")] public int chunksX = 4;
-    public int chunksZ = 4;
-    public int resolutionPerChunk = 64; // Вершин на сторону чанка - 1
-    public float sizePerChunk = 10;
+    [Header("Chunk Settings")]
+    public int chunksX = 32;
+    public int chunksZ = 32;
+    public int resolutionPerChunk = 24;
+    public int sizePerChunk = 10;
 
     [Header("Terrain Generation - Base Noise")]
     public float maxHeight = 15; // Общая максимальная высота
 
-    public float terrainScale = 64.0f; // Масштаб базового шума
-    public int octaves = 5; // Количество слоев шума
-    [Range(0f, 1f)] public float persistence = 0.387f; // Уменьшение амплитуды октав
-    public float lacunarity = 3.0f; // Увеличение частоты октав
+    public float terrainScale = 30.0f; // Масштаб базового шума
+    public int octaves = 8; // Количество слоев шума
+    [Range(0f, 1f)] public float persistence = 0.382f; // Уменьшение амплитуды октав
+    public float lacunarity = 2.0f; // Увеличение частоты октав
     public float noiseOffsetX = 20f; // Смещение основного шума по X
     public float noiseOffsetZ = 50f; // Смещение основного шума по Z
 
@@ -41,9 +42,9 @@ public class ChunkedTerrainGenerator : MonoBehaviour
 
     [Header("Valleys (Noise Based)")]
     public bool useValleys = true; // Включить/выключить шумные долины
-    public float valleyNoiseScale = 150f; // Масштаб шума долин (обычно больше terrainScale)
-    public float valleyDepth = 8f; // Максимальная глубина долины
-    [Range(1f, 10f)] public float valleyWidthFactor = 4f; // Влияет на ширину/резкость краев долин (больше = уже)
+    public float valleyNoiseScale = 60f; // Масштаб шума долин (обычно больше terrainScale)
+    public float valleyDepth = 6f; // Максимальная глубина долины
+    [Range(1f, 10f)] public float valleyWidthFactor = 1.6f; // Влияет на ширину/резкость краев долин (больше = уже)
     public float valleyNoiseOffsetX = 3000f; // Смещение шума долин X
     public float valleyNoiseOffsetZ = 4000f; // Смещение шума долин Z
 
@@ -52,8 +53,8 @@ public class ChunkedTerrainGenerator : MonoBehaviour
     public bool cutoffToBottom = true; // Срезать долину до дна (упрощенный вариант)
     public SplineContainer splineContainer; // Сюда перетащить объект со сплайнами из сцены
     public float splineValleyWidth = 5f; // Ширина плоского дна долины
-    public float splineValleyDepth = 6f; // Глубина долины в центре относительно окружающего рельефа
-    public float splineValleyFalloff = 10f; // Расстояние, на котором долина переходит в обычный рельеф (ширина склона)
+    public float splineValleyDepth = 12f; // Глубина долины в центре относительно окружающего рельефа
+    public float splineValleyFalloff = 20f; // Расстояние, на котором долина переходит в обычный рельеф (ширина склона)
 
     // По умолчанию EaseInOut: начинается и заканчивается плавно, похоже на smoothstep
     // Ключи: (время=0, значение=1), (время=1, значение=0)
@@ -75,12 +76,12 @@ public class ChunkedTerrainGenerator : MonoBehaviour
     public float roadMeshStep = 1.0f; // Например, 1 метр
 
     [Tooltip("Насколько приподнять меш дороги над террейном")]
-    public float roadRaise = 0.05f;
+    public float roadRaise = 0.2f;
 
     [Header("Deformation")]
     public float deformRadius = 0.35f;
     public float deformStrength = 0.1f;
-    public float maxDeformDepth = 0.2f;
+    public float maxDeformDepth = 0.24f;
 
     [Header("Materials")]
     public Material terrainMaterial;
@@ -88,7 +89,7 @@ public class ChunkedTerrainGenerator : MonoBehaviour
 
     public static event Action OnChunksRegenerated;
     internal List<Spline> cachedSplines = null;
-    
+
     private static readonly int SceneView1 = Shader.PropertyToID("_SceneView");
     
     
