@@ -44,7 +44,7 @@ public class WheelVisualizerAndCollider : MonoBehaviour
     void FixedUpdate()
     {
         // Проверяем, есть ли под колесом земля
-        if (Physics.Raycast(wheelMesh.position, Vector3.down, out RaycastHit hit, 5f, groundLayer))
+        if (Physics.Raycast(wheelMesh.position, Vector3.down, out RaycastHit hit, 1.0f, groundLayer))
         {
             // Попробуем получить актуальный радиус деформации из чанка, в который попали
             float currentDeformRadius = lastKnownDeformRadius;
