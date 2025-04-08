@@ -1,39 +1,52 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// Требуется реализация PriorityQueue, например, из стандартных коллекций или кастомная.
-// Если у тебя ее нет, сообщи - могу предоставить простой вариант.
-// using PriorityQueue; // Пример пространства имен
-
 public class PathfindingManager : MonoBehaviour
 {
     public static PathfindingManager Instance { get; private set; }
-    public WorldStreamer worldStreamer; // Убедись, что ссылка назначена в инспекторе
+    public WorldStreamer worldStreamer; // Assign in inspector
 
-    [Header("Grid Settings")] public float cellSize = 1f; // Размер ячейки сетки пути
+    [Header("Grid Settings")]
+    public float cellSize = 1f; // Path grid cell size
 
-    [Header("Path Costs")] public float roadCost = 1f; // Стоимость движения по дороге
-    public float defaultCost = 5f; // Стандартная стоимость движения
-    public float heightCostMultiplier = 0.5f; // Влияние высоты на стоимость
+    [Header("Path Costs")]
+    [Tooltip("Cost for traversing the main road surface.")]
+    public float roadCost = 1.0f; // Cost for regular road
+    [Tooltip("Cost for traversing the preferred center strip of the road.")]
+    public float roadCenterCost = 0.5f; // Lower cost for the center strip!
+    [Tooltip("Default cost for traversing terrain (non-road).")]
+    public float defaultCost = 5.0f; // Default terrain cost
+    [Tooltip("Multiplier for adding cost based on terrain height.")]
+    public float heightCostMultiplier = 0.5f; // Height penalty
 
-    [Header("Path Simplification")] [Tooltip("Минимальное желаемое расстояние между точками в итоговом пути")]
-    public float minPathPointDistance = 5f; // Желаемое расстояние между точками пути
+    [Header("Layer Names")]
+    [Tooltip("Name of the layer used for the main road surface.")]
+    public string roadLayerName = "Road"; // Assuming the edges/shoulders mesh is on "Road" layer now
+    [Tooltip("Name of the layer used for the road's center strip (must exist!).")]
+    public string roadCenterLayerName = "RoadCenter"; // Must match the layer used in ChunkedTerrainGenerator
 
-    [Tooltip("Слои, считающиеся проходимой поверхностью для определения высоты точек пути")]
-    public LayerMask walkableLayerMask; // Настрой в инспекторе (например, Terrain, Road)
+    [Header("Path Simplification")]
+    [Tooltip("Minimum desired distance between points in the final path.")]
+    public float minPathPointDistance = 3.0f; // Increased default distance slightly
+
+    [Header("Masks")]
+    [Tooltip("Layers considered walkable for pathfinding raycasts (MUST include Terrain, Road, and RoadCenter layers).")]
+    public LayerMask walkableLayerMask; // Assign in inspector (TerrainChunk, Road, RoadCenter)
 
     private int worldSizeX;
     private int worldSizeZ;
-    private float[,] costMap; // Карта стоимостей для A*
+    private float[,] costMap; // Cost map for A*
+
+    private int roadLayerId = -1;
+    private int roadCenterLayerId = -1;
 
 
     void Awake()
     {
-        // Синглтон
+        // Singleton pattern
         if (!Instance)
         {
             Instance = this;
-            // DontDestroyOnLoad(gameObject); // Раскомментируй, если менеджер должен жить между сценами
         }
         else if (Instance != this)
         {
@@ -41,239 +54,279 @@ public class PathfindingManager : MonoBehaviour
             return;
         }
 
-        if (!worldStreamer)
+        if (worldStreamer == null)
         {
-            Debug.LogError("WorldStreamer не назначен в PathfindingManager!", this);
-            enabled = false; // Отключаем компонент, если нет зависимости
+            Debug.LogError("WorldStreamer is not assigned in PathfindingManager!", this);
+            enabled = false; // Disable if dependency is missing
             return;
+        }
+
+        // Get layer IDs for faster comparison later
+        roadLayerId = LayerMask.NameToLayer(roadLayerName);
+        roadCenterLayerId = LayerMask.NameToLayer(roadCenterLayerName);
+
+        if (roadLayerId == -1)
+        {
+            Debug.LogError($"PathfindingManager: Layer '{roadLayerName}' not found! Please ensure it exists.", this);
+            // Optionally disable component or handle error
+        }
+        if (roadCenterLayerId == -1)
+        {
+             Debug.LogError($"PathfindingManager: Layer '{roadCenterLayerName}' not found! Please ensure it exists.", this);
+             // Optionally disable component or handle error
         }
     }
 
     void Start()
     {
+        // Ensure TerrainGenerator is available
         if (!worldStreamer.terrainGenerator)
         {
-            Debug.LogError("TerrainGenerator не найден в WorldStreamer на момент Start!", this);
+            Debug.LogError("TerrainGenerator not found in WorldStreamer at Start!", this);
             enabled = false;
             return;
         }
-
         InitializePathfinding();
     }
-    
+
     void InitializePathfinding()
     {
+        if (worldStreamer == null || worldStreamer.terrainGenerator == null) {
+             Debug.LogError("Initialization failed: WorldStreamer or TerrainGenerator is missing.", this);
+             return;
+        }
         worldSizeX = worldStreamer.terrainGenerator.chunksX * worldStreamer.terrainGenerator.sizePerChunk;
         worldSizeZ = worldStreamer.terrainGenerator.chunksZ * worldStreamer.terrainGenerator.sizePerChunk;
 
-        GenerateCostMap(); // Генерируем карту стоимостей
-        // Подписываемся на событие регенерации чанков, чтобы обновить карту
+        GenerateCostMap(); // Generate the cost map
+
+        // Subscribe to chunk regeneration events to update the cost map
+        ChunkedTerrainGenerator.OnChunksRegenerated -= GenerateCostMap; // Unsubscribe first to prevent duplicates
         ChunkedTerrainGenerator.OnChunksRegenerated += GenerateCostMap;
         Debug.Log("Pathfinding Initialized.");
     }
 
     void OnDestroy()
     {
-        // Отписываемся от события при уничтожении объекта, чтобы избежать утечек памяти
+        // Unsubscribe from events to prevent memory leaks
         ChunkedTerrainGenerator.OnChunksRegenerated -= GenerateCostMap;
 
         if (Instance == this)
         {
-            Instance = null; // Очищаем ссылку на синглтон
+            Instance = null; // Clear singleton reference
         }
     }
 
     /// <summary>
-    /// Генерирует карту стоимостей для каждой ячейки мира.
+    /// Generates the cost map used by the A* algorithm.
     /// </summary>
      public void GenerateCostMap()
     {
         if (worldSizeX <= 0 || worldSizeZ <= 0) {
-             Debug.LogError("Неверные размеры мира для генерации карты стоимостей.", this);
+             Debug.LogError("Invalid world size for cost map generation.", this);
              return;
         }
+        // Check if layer IDs are valid before proceeding
+        if (roadLayerId == -1 || roadCenterLayerId == -1) {
+             Debug.LogError("Cannot generate cost map: Required road layers not found.", this);
+             return;
+        }
+
 
         costMap = new float[worldSizeX, worldSizeZ];
         Debug.Log($"Generating cost map for size: {worldSizeX}x{worldSizeZ}");
 
-        int impassableCount = 0; // Счетчик непроходимых ячеек
+        int impassableCount = 0; // Counter for impassable cells
 
         for (int x = 0; x < worldSizeX; x++)
         {
             for (int z = 0; z < worldSizeZ; z++)
             {
-                // Центр ячейки для Raycast
+                // Center of the cell for Raycast
                 float worldX = x * cellSize + cellSize / 2f;
                 float worldZ = z * cellSize + cellSize / 2f;
-                Vector3 rayStartPos = new Vector3(worldX, 500f, worldZ); // Начинаем луч высоко
-                float rayDistance = 1000f; // Длина луча
+                // Start raycast high enough to be above potential terrain/roads
+                Vector3 rayStartPos = new Vector3(worldX, 500f, worldZ); // Adjust Y start if needed
+                float rayDistance = 1000f; // Adjust distance if needed
 
-                if (Physics.Raycast(rayStartPos, Vector3.down, out RaycastHit hit, rayDistance, walkableLayerMask)) // Используем walkableLayerMask
+                // Raycast downwards using the walkableLayerMask
+                if (Physics.Raycast(rayStartPos, Vector3.down, out RaycastHit hit, rayDistance, walkableLayerMask))
                 {
-                    // Рассчитываем стоимость на основе высоты и типа поверхности
-                    float heightCost = hit.point.y * heightCostMultiplier;
-                    float finalCost = defaultCost + heightCost;
+                    float finalCost;
+                    int hitLayer = hit.collider.gameObject.layer;
 
-                    // Проверяем слой объекта, в который попал луч
-                    if (hit.collider.gameObject.layer == LayerMask.NameToLayer("Road")) // Убедись, что слой "Road" существует
+                    // 1. Проверяем слой центральной полосы (самый низкий приоритет/стоимость)
+                    if (hitLayer == roadCenterLayerId)
+                    {
+                        finalCost = roadCenterCost;
+                    }
+                    // 2. Если не центр, проверяем слой обычной дороги
+                    else if (hitLayer == roadLayerId)
                     {
                         finalCost = roadCost;
                     }
-                    // Можно добавить другие условия для разных типов местности
+                    // 3. Иначе - это обычный проходимый террейн
+                    else
+                    {
+                        // Calculate cost based on default cost and height penalty
+                        float heightCost = hit.point.y * heightCostMultiplier;
+                        finalCost = defaultCost + heightCost;
+                    }
 
-                    costMap[x, z] = Mathf.Max(1f, finalCost); // Стоимость не должна быть <= 0
+                    // Ensure cost is at least 1 (or a small positive value) to avoid issues with A*
+                    costMap[x, z] = Mathf.Max(0.1f, finalCost);
                 }
                 else
                 {
-                    // Если под ячейкой нет земли (пропасть), делаем ее непроходимой
+                    // If raycast doesn't hit anything in walkableLayerMask, mark as impassable
                     costMap[x, z] = float.MaxValue;
-                    impassableCount++; // Увеличиваем счетчик
-                    // --- ДОБАВЛЕНО: Лог для ячеек, где Raycast не сработал ---
-                    // Закомментируй, если логов будет слишком много
-                    // Debug.LogWarning($"Raycast failed for cell ({x}, {z}). Marked as impassable.");
-                    // --- КОНЕЦ ДОБАВЛЕННОГО ---
+                    impassableCount++; // Increment counter
                 }
             }
         }
-        // --- ДОБАВЛЕНО: Лог о количестве непроходимых ячеек ---
         Debug.Log($"Cost map generated successfully. Impassable cells: {impassableCount} out of {worldSizeX * worldSizeZ}");
-        // --- КОНЕЦ ДОБАВЛЕННОГО ---
     }
 
     /// <summary>
-    /// Находит путь между двумя точками в мире с использованием A* и упрощает его.
+    /// Finds a path between two world positions using A* and simplifies it.
     /// </summary>
-    /// <param name="startPos">Начальная точка пути.</param>
-    /// <param name="endPos">Конечная точка пути.</param>
-    /// <returns>Список точек упрощенного пути или пустой список, если путь не найден.</returns>
+    /// <param name="startPos">Starting world position.</param>
+    /// <param name="endPos">Ending world position.</param>
+    /// <returns>A list of Vector3 points representing the simplified path, or an empty list if no path is found.</returns>
     public List<Vector3> FindPath(Vector3 startPos, Vector3 endPos)
     {
-        // Проверяем, инициализирована ли карта стоимостей
+        // Check if cost map is initialized
         if (costMap == null)
         {
-            Debug.LogError("Карта стоимостей (costMap) не инициализирована. Поиск пути невозможен.", this);
+            Debug.LogError("Cost map is not initialized. Cannot find path.", this);
             return new List<Vector3>();
         }
 
         Vector2Int startCell = WorldToCell(startPos);
         Vector2Int endCell = WorldToCell(endPos);
-        
-        // --- ДОБАВЛЕНО: Логирование стоимости стартовой и конечной ячеек ---
-        float startCellCost = IsCellValid(startCell) ? costMap[startCell.x, startCell.y] : -1f; // -1f если ячейка вне карты
-        float endCellCost = IsCellValid(endCell) ? costMap[endCell.x, endCell.y] : -1f;
-        Debug.Log($"FindPath: StartCell={startCell}, Cost={startCellCost} | EndCell={endCell}, Cost={endCellCost}");
-        // --- КОНЕЦ ДОБАВЛЕННОГО ---
 
-        // Проверка валидности ячеек
+        // Log costs of start/end cells for debugging
+        float startCellCost = IsCellValid(startCell) ? costMap[startCell.x, startCell.y] : -1f;
+        float endCellCost = IsCellValid(endCell) ? costMap[endCell.x, endCell.y] : -1f;
+        // Debug.Log($"FindPath Request: StartCell={startCell}, Cost={startCellCost} | EndCell={endCell}, Cost={endCellCost}"); // Optional detailed log
+
+        // Check if start or end cells are valid and passable
         if (!IsCellValid(startCell) || !IsCellValid(endCell))
         {
-            Debug.LogWarning($"Начальная ({startCell}) или конечная ({endCell}) ячейка вне допустимых границ мира.",
-                this);
+            Debug.LogWarning($"Start ({startCell}) or End ({endCell}) cell is outside world bounds.", this);
             return new List<Vector3>();
         }
-        
-        // --- ИЗМЕНЕНО: Используем проверенные значения стоимости ---
         if (startCellCost == float.MaxValue || endCellCost == float.MaxValue) {
-            Debug.LogWarning($"Начальная ({startCell}, Cost={startCellCost}) или конечная ({endCell}, Cost={endCellCost}) ячейка непроходима.", this);
+            Debug.LogWarning($"Start ({startCell}, Cost={startCellCost}) or End ({endCell}, Cost={endCellCost}) cell is impassable.", this);
             return new List<Vector3>();
         }
-        // --- КОНЕЦ ИЗМЕНЕНИЯ ---
 
-        // Структуры данных для A*
-        PriorityQueue<Vector2Int> openSet = new PriorityQueue<Vector2Int>(); // Очередь с приоритетом
+        // A* data structures
+        PriorityQueue<Vector2Int> openSet = new PriorityQueue<Vector2Int>();
+        Dictionary<Vector2Int, Vector2Int> cameFrom = new Dictionary<Vector2Int, Vector2Int>();
+        Dictionary<Vector2Int, float> costSoFar = new Dictionary<Vector2Int, float>();
+
+        // Initialize start node
         openSet.Enqueue(startCell, 0);
-
-        Dictionary<Vector2Int, Vector2Int>
-            cameFrom = new Dictionary<Vector2Int, Vector2Int>(); // Откуда пришли в ячейку
-        Dictionary<Vector2Int, float> costSoFar = new Dictionary<Vector2Int, float>(); // Стоимость пути до ячейки
-
-        // Инициализация для стартовой ячейки
-        cameFrom[startCell] = startCell; // Сама на себя ссылается
+        cameFrom[startCell] = startCell; // Point to itself
         costSoFar[startCell] = 0;
 
-        // Основной цикл A*
+        // A* main loop
         while (openSet.Count > 0)
         {
-            Vector2Int current = openSet.Dequeue(); // Берем ячейку с наименьшей оценкой
+            Vector2Int current = openSet.Dequeue();
 
-            // Цель достигнута
+            // Goal reached
             if (current == endCell)
                 break;
 
-            // Обработка соседей
+            // Process neighbors
             foreach (Vector2Int next in GetNeighbors(current))
             {
-                // Пропускаем непроходимые ячейки
-                if (costMap[next.x, next.y] == float.MaxValue) continue;
+                 // Skip invalid or impassable neighbors
+                 if (!IsCellValid(next)) continue; // Check bounds first
+                 float neighborCost = costMap[next.x, next.y];
+                 if (neighborCost == float.MaxValue) continue; // Skip impassable
 
-                // Рассчитываем новую стоимость пути до соседа
-                float newCost = costSoFar[current] + costMap[next.x, next.y]; // Используем стоимость из карты
+                // Calculate cost to reach neighbor through current node
+                // Ensure 'current' exists in costSoFar before accessing (should always be true if logic is correct)
+                 float currentPathCost = costSoFar.ContainsKey(current) ? costSoFar[current] : float.MaxValue;
+                 if (currentPathCost == float.MaxValue) {
+                      // This shouldn't happen if current was dequeued, indicates a potential issue
+                      Debug.LogError($"Internal A* Error: Cost for current node {current} not found!");
+                      continue;
+                 }
+                 float newCost = currentPathCost + neighborCost; // Cost from start to neighbor via current
 
-                // Если нашли более короткий путь до соседа или еще не были там
+
+                // If this path to neighbor is better than any previous one, or if neighbor hasn't been visited
                 if (!costSoFar.ContainsKey(next) || newCost < costSoFar[next])
                 {
-                    costSoFar[next] = newCost; // Обновляем стоимость
-                    float priority = newCost + Heuristic(next, endCell); // Приоритет = стоимость + эвристика
-                    openSet.Enqueue(next, priority); // Добавляем/обновляем в очереди
-                    cameFrom[next] = current; // Запоминаем, откуда пришли
+                    costSoFar[next] = newCost; // Update cost
+                    float priority = newCost + Heuristic(next, endCell); // Calculate priority (f = g + h)
+                    openSet.Enqueue(next, priority); // Add/update neighbor in the open set
+                    cameFrom[next] = current; // Record path
                 }
             }
         }
 
-        // --- Восстановление и упрощение пути ---
+        // --- Path Reconstruction and Simplification ---
         List<Vector3> detailedPath = ReconstructPath(cameFrom, startPos, startCell, endCell);
 
         if (detailedPath.Count == 0 && startCell != endCell)
         {
-            Debug.LogWarning($"Путь от {startCell} до {endCell} не найден!", this);
-            return detailedPath; // Возвращаем пустой список
+            // Only log warning if start and end are different cells but path is empty
+            Debug.LogWarning($"Path not found from {startCell} to {endCell}!", this);
+            return detailedPath; // Return empty list
         }
 
-        // Упрощаем путь перед возвратом
+        // Simplify the path using distance threshold
         List<Vector3> simplifiedPath = SimplifyPathByDistance(detailedPath, minPathPointDistance);
 
-        // Debug.Log($"Original path points: {detailedPath.Count}, Simplified path points: {simplifiedPath.Count}");
+        // Debug.Log($"Path found: Original points={detailedPath.Count}, Simplified points={simplifiedPath.Count}");
 
-        return simplifiedPath; // Возвращаем упрощенный путь
+        return simplifiedPath;
     }
 
     /// <summary>
-    /// Восстанавливает путь из данных A*.
+    /// Reconstructs the path from A* data.
     /// </summary>
     private List<Vector3> ReconstructPath(Dictionary<Vector2Int, Vector2Int> cameFrom, Vector3 startPos,
         Vector2Int startCell, Vector2Int endCell)
     {
-        // draw path for debugging
-        Debug.DrawLine(startPos, CellToWorld(endCell), Color.red, 5f);
-        
         List<Vector3> path = new List<Vector3>();
         Vector2Int currentCell = endCell;
 
-        // Если конечная точка недостижима
+        // If end cell was never reached
         if (!cameFrom.ContainsKey(endCell))
         {
-            return path; // Возвращаем пустой путь
+            return path; // Return empty path
         }
 
-        // Идем от конечной точки к начальной по словарю cameFrom
+        // Trace back from end to start
         while (currentCell != startCell)
         {
-            path.Add(CellToWorld(currentCell)); // Добавляем мировую позицию ячейки
-            // Безопасный доступ к словарю
-            if (!cameFrom.TryGetValue(currentCell, out currentCell))
+            path.Add(CellToWorld(currentCell)); // Add world position of the cell
+            // Safely get the previous cell
+            if (!cameFrom.TryGetValue(currentCell, out Vector2Int previousCell))
             {
-                Debug.LogError(
-                    $"Ошибка восстановления пути: ключ {currentCell} отсутствует в cameFrom. Путь может быть неполным.",
-                    this);
-                path.Reverse(); // Разворачиваем то, что успели собрать
-                return path; // Возвращаем неполный путь
+                 Debug.LogError($"Path reconstruction error: Key {currentCell} not found in cameFrom dictionary. Path might be incomplete.", this);
+                 path.Reverse(); // Reverse what we have so far
+                 return path; // Return potentially incomplete path
             }
+             // Check for potential infinite loop (shouldn't happen with correct A*)
+             if(previousCell == currentCell) {
+                  Debug.LogError($"Path reconstruction error: Loop detected at cell {currentCell}.");
+                  path.Reverse();
+                  return path;
+             }
+            currentCell = previousCell;
         }
 
-        // Добавляем начальную позицию (она точнее, чем центр стартовой ячейки)
+        // Add the actual starting world position (more accurate than cell center)
         path.Add(startPos);
 
-        // Разворачиваем список, чтобы путь был от начала к концу
+        // Reverse the list to get the path from start to end
         path.Reverse();
 
         return path;
@@ -281,36 +334,34 @@ public class PathfindingManager : MonoBehaviour
 
 
     /// <summary>
-    /// Упрощает путь, оставляя точки на расстоянии не менее minDistance друг от друга.
+    /// Simplifies the path by removing points that are too close together.
     /// </summary>
-    /// <param name="path">Исходный детальный путь.</param>
-    /// <param name="minDistance">Минимальное расстояние между точками.</param>
-    /// <returns>Упрощенный путь.</returns>
     private List<Vector3> SimplifyPathByDistance(List<Vector3> path, float minDistance)
     {
         if (path == null || path.Count <= 2)
         {
-            return path; // Нечего упрощать
+            return path; // Nothing to simplify
         }
 
         List<Vector3> simplifiedPath = new List<Vector3>();
-        simplifiedPath.Add(path[0]); // Всегда добавляем начальную точку
+        simplifiedPath.Add(path[0]); // Always add the first point
 
         Vector3 lastAddedPoint = path[0];
-        // Используем квадрат расстояния для оптимизации (избегаем вызова Sqrt)
+        // Use squared distance for efficiency (avoids square root calculation)
         float sqrMinDistance = minDistance * minDistance;
 
-        for (int i = 1; i < path.Count - 1; i++) // Идем до предпоследней точки
+        // Iterate through the path, skipping the first and last points initially
+        for (int i = 1; i < path.Count - 1; i++)
         {
-            // Если квадрат расстояния до последней добавленной точки больше или равен минимальному
+            // If the squared distance from the last added point is sufficient
             if ((path[i] - lastAddedPoint).sqrMagnitude >= sqrMinDistance)
             {
-                simplifiedPath.Add(path[i]); // Добавляем текущую точку
-                lastAddedPoint = path[i]; // Обновляем последнюю добавленную точку
+                simplifiedPath.Add(path[i]); // Add this point
+                lastAddedPoint = path[i]; // Update the last added point
             }
         }
 
-        // Всегда добавляем самую последнюю точку исходного пути, чтобы точно дойти до цели
+        // Always add the very last point of the original path to ensure the destination is reached
         simplifiedPath.Add(path[path.Count - 1]);
 
         return simplifiedPath;
@@ -318,34 +369,29 @@ public class PathfindingManager : MonoBehaviour
 
 
     /// <summary>
-    /// Возвращает соседей ячейки (только по 4 направлениям).
+    /// Returns valid neighbors of a cell (4-directional).
     /// </summary>
     private IEnumerable<Vector2Int> GetNeighbors(Vector2Int cell)
     {
-        // Смещения для соседей (вправо, влево, вверх, вниз)
         var directions = new Vector2Int[]
         {
-            new Vector2Int(1, 0), new Vector2Int(-1, 0),
-            new Vector2Int(0, 1), new Vector2Int(0, -1)
-            // Можно добавить диагонали при необходимости:
-            // new Vector2Int(1, 1), new Vector2Int(1, -1),
-            // new Vector2Int(-1, 1), new Vector2Int(-1, -1)
-            // Но тогда нужно скорректировать расчет стоимости и эвристики
+            new Vector2Int(1, 0), new Vector2Int(-1, 0), // Right, Left
+            new Vector2Int(0, 1), new Vector2Int(0, -1)  // Up, Down (Map coordinates)
         };
 
         foreach (var dir in directions)
         {
             Vector2Int next = cell + dir;
-            // Проверяем, находится ли сосед в пределах карты
+            // Check if the neighbor is within the world bounds
             if (IsCellValid(next))
             {
-                yield return next; // Возвращаем валидного соседа
+                yield return next;
             }
         }
     }
 
     /// <summary>
-    /// Проверяет, находится ли ячейка в пределах карты мира.
+    /// Checks if a cell coordinate is within the world bounds.
     /// </summary>
     private bool IsCellValid(Vector2Int cell)
     {
@@ -353,97 +399,63 @@ public class PathfindingManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Эвристика Манхэттенского расстояния для A*.
+    /// Calculates the Manhattan distance heuristic for A*.
     /// </summary>
     private float Heuristic(Vector2Int a, Vector2Int b)
     {
-        // Подходит для движения по 4 направлениям
+        // Manhattan distance is suitable for grid movement without diagonals
         return Mathf.Abs(a.x - b.x) + Mathf.Abs(a.y - b.y);
-        // Для движения по 8 направлениям лучше использовать диагональное расстояние:
-        // float dx = Mathf.Abs(a.x - b.x);
-        // float dy = Mathf.Abs(a.y - b.y);
-        // return Mathf.Max(dx, dy) + (Mathf.Sqrt(2) - 1) * Mathf.Min(dx, dy); // Или просто Max(dx, dy)
     }
 
     /// <summary>
-    /// Преобразует мировые координаты в координаты ячейки сетки.
+    /// Converts world coordinates to grid cell coordinates.
     /// </summary>
     private Vector2Int WorldToCell(Vector3 pos)
     {
-        // Убедимся, что деление на ноль не произойдет
         if (cellSize <= 0)
         {
-            Debug.LogError("CellSize равен нулю или меньше, невозможно преобразовать координаты.", this);
-            return Vector2Int.zero;
+            Debug.LogError("CellSize is zero or negative, cannot convert world to cell.", this);
+            return Vector2Int.zero; // Return default value
         }
 
+        // Calculate cell indices
         int x = Mathf.FloorToInt(pos.x / cellSize);
         int z = Mathf.FloorToInt(pos.z / cellSize);
-        // Ограничиваем значения границами карты на всякий случай
+
+        // Clamp indices to be within the valid range of the cost map
         x = Mathf.Clamp(x, 0, worldSizeX - 1);
         z = Mathf.Clamp(z, 0, worldSizeZ - 1);
+
         return new Vector2Int(x, z);
     }
 
     /// <summary>
-    /// Преобразует координаты ячейки в мировые координаты (центр ячейки с реальной высотой).
+    /// Converts grid cell coordinates to world coordinates (center of cell with actual height).
     /// </summary>
     private Vector3 CellToWorld(Vector2Int cell)
     {
-        // Центр ячейки по X и Z
+        // Calculate center of the cell in XZ plane
         float worldX = cell.x * cellSize + cellSize / 2f;
         float worldZ = cell.y * cellSize + cellSize / 2f;
-        float worldY = 0f; // Высота по умолчанию
+        float worldY = 0f; // Default height if terrain lookup fails
 
-        // Ищем высоту поверхности под центром ячейки
-        Vector3 rayStart = new Vector3(worldX, 1000f, worldZ); // Луч сверху вниз
-        if (Physics.Raycast(rayStart, Vector3.down, out RaycastHit hit, 2000f,
-                walkableLayerMask)) // Используем маску проходимых слоев
+        // Find the actual height of the surface at the cell center
+        // Start raycast high above the potential surface
+        Vector3 rayStart = new Vector3(worldX, 1000f, worldZ); // Adjust Y start height if necessary
+        float rayLength = 2000f; // Adjust ray length if necessary
+
+        // Raycast down using the walkableLayerMask to find the ground
+        if (Physics.Raycast(rayStart, Vector3.down, out RaycastHit hit, rayLength, walkableLayerMask))
         {
-            worldY = hit.point.y; // Используем высоту точки попадания луча
+            worldY = hit.point.y; // Use the exact hit point height
         }
         else
         {
-            // Если поверхность не найдена (например, над пропастью)
-            // Можно попробовать найти высоту ближайшей валидной ячейки или использовать запасное значение
-            // Debug.LogWarning($"Не удалось определить высоту для ячейки {cell}. Используется Y=0.", this);
-            // Как вариант, можно взять высоту из costMap, если она там хранится осмысленно,
-            // но costMap хранит стоимость, а не высоту. Лучше оставить 0 или найти соседа.
+            // Optional: Handle cases where no ground is found (e.g., over a chasm)
+            // Debug.LogWarning($"Could not determine height for cell {cell}. Using Y=0.", this);
+            // Consider alternative strategies: use neighbor height, use a default height, or mark cell as invalid?
         }
 
         return new Vector3(worldX, worldY, worldZ);
     }
 }
-
-// Не забудь добавить или убедиться в наличии реализации PriorityQueue<T>
-// Пример простой реализации (если нужна):
-/*
-public class PriorityQueue<T>
-{
-    private List<KeyValuePair<T, float>> elements = new List<KeyValuePair<T, float>>();
-
-    public int Count => elements.Count;
-
-    public void Enqueue(T item, float priority)
-    {
-        elements.Add(new KeyValuePair<T, float>(item, priority));
-    }
-
-    // Не самая эффективная реализация Dequeue, но простая
-    public T Dequeue()
-    {
-        int bestIndex = 0;
-        for (int i = 1; i < elements.Count; i++)
-        {
-            if (elements[i].Value < elements[bestIndex].Value)
-            {
-                bestIndex = i;
-            }
-        }
-
-        T bestItem = elements[bestIndex].Key;
-        elements.RemoveAt(bestIndex);
-        return bestItem;
-    }
-}
-*/

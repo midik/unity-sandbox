@@ -14,7 +14,7 @@ public class NpcCarController : Driveable
     public float avoidanceSteerForce = 1.0f;
     public float reverseTime = 1.0f;
     public float turnTime = 1.5f;
-    public float throttleWhileSteering = 0.3f;
+    public float throttleWhileSteering = 0.6f;
 
     [Tooltip("How close the car needs to be to a waypoint to switch to the next one.")]
     public float waypointSwitchDistance = 3.0f;
@@ -26,12 +26,6 @@ public class NpcCarController : Driveable
     public int obstacleFeelerCount = 5; // Нечетное число >= 1
     public float obstacleFeelerAngle = 30f; // Угол для крайних лучей
     public float obstacleAvoidanceWeight = 2.0f; // Приоритет избегания
-
-    [Header("Road Following")] public bool useRoadPreference = true;
-    public float roadPreferenceWeight = 3.0f; // Насколько сильно предпочитаем дороги
-    public float maxRoadCheckDistance = 50f; // Максимальное расстояние проверки дорог
-    public float optimalRoadDistance = 1f; // Оптимальное расстояние до дороги
-    public LayerMask roadLayerMask; // Слой для дорог
 
     private AliveDetector aliveDetector;
     private Logger logger;

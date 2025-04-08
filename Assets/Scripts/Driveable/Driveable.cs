@@ -29,6 +29,8 @@ public abstract class Driveable : Respawnable
 {
     [Header("Handling")]
     public float maxSteeringAngle = 30f;
+    [Tooltip("How fast the steering wheel turns towards the target angle (degrees per second).")]
+    public float steeringSpeed = 120f; // Скорость поворота руля (градусов/сек)
 
     [Header("Powertrain Components")]
     public Engine engine;
@@ -56,11 +58,14 @@ public abstract class Driveable : Respawnable
     [SerializeField, ReadOnly] protected int currentGear;
     [SerializeField, ReadOnly] protected float currentEngineTorque;
     [SerializeField, ReadOnly] protected float currentWheelTorque; // Torque *after* gearbox/diff
+    [SerializeField, ReadOnly] protected float currentActualSteerAngle; // Текущий сглаженный угол
 
     // --- Internal State ---
     protected float throttleInput; // 0..1
     protected float brakeInput; // 0..1
     protected float steeringInput; // -1..1
+    
+    private float _currentActualSteerAngleInternal; // Приватная переменная для хранения сглаженного угла
 
     private WheelCollider[] wheelColliders = new WheelCollider[4]; // FL, FR, RL, RR order assumed
     private const int rpmSmoothingWindow = 30;
@@ -132,12 +137,21 @@ public abstract class Driveable : Respawnable
         throttleInput = Mathf.Clamp01(throttle);
         brakeInput = Mathf.Clamp01(brake);
         steeringInput = Mathf.Clamp(steering, -1f, 1f);
+        
+        // Calculate the target angle based on input and max angle
+        float targetSteerAngle = steeringInput * maxSteeringAngle;
+        // Smoothly move the current actual angle towards the target angle
+        // Use Time.deltaTime if called from Update, Time.fixedDeltaTime if called from FixedUpdate
+        // Assuming this is called from FixedUpdate based on physics interaction
+        _currentActualSteerAngleInternal = Mathf.MoveTowards(
+            _currentActualSteerAngleInternal, // Current angle
+            targetSteerAngle,                 // Target angle
+            steeringSpeed * Time.fixedDeltaTime // Max change per fixed update step
+        );
+        // Update the readout variable
+        currentActualSteerAngle = _currentActualSteerAngleInternal;
 
         currentSpeedKmh = rb.linearVelocity.magnitude * 3.6f; // Convert m/s to km/h
-
-        if (engine.isRunning)
-        {
-        }
 
         // Calculate current speed & wheel RPM
         drivenWheelRPM = CalculateDrivenWheelRPM();
@@ -206,7 +220,11 @@ public abstract class Driveable : Respawnable
 
             if (i < 2)
             {
-                wheelColliders[i].steerAngle = steeringInput * maxSteeringAngle;
+                wheelColliders[i].steerAngle = _currentActualSteerAngleInternal; // Use the smoothed angle
+            }
+            else
+            {
+                wheelColliders[i].steerAngle = 0f; // Ensure rear wheels don't steer
             }
 
             bool isDriven = (drivetrainMode == DrivetrainMode.AWD) ||
@@ -310,8 +328,6 @@ public abstract class Driveable : Respawnable
     }
 
     public float GetEngineRPM() => engine.CurrentRPM;
-
-    public float GetEngineMaxRPM() => engine.maxRPM;
 
     public int GetCurrentGear() => gearbox.CurrentGearIndex;
 
